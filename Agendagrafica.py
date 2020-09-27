@@ -1,6 +1,7 @@
 from tkinter import *
 
 
+
 import sqlite3
 
 con = sqlite3.connect("mydb.db")
@@ -14,6 +15,7 @@ query2 = """ SELECT * FROM contactos; """
 
 ventana = Tk()
 ventana.title("Agenda VyperCode")
+
 
 #funciones tkinter
 def click_boton(valor):
@@ -52,28 +54,17 @@ def actualizarcontacto(nombrecontacto,numerocontacto,correocontacto,contactoid):
 
 #Botones
 
-boton1 = Button(ventana, text = "1", width = 5, height = 2 , command = lambda: click_boton(1))
-boton2 = Button(ventana, text = "2", width = 5, height = 2 ,command = lambda: click_boton(2))
-boton3 = Button(ventana, text = "3", width = 5, height = 2 ,command = lambda: click_boton(3))
-boton4 = Button(ventana, text = "4", width = 5, height = 2 ,command = lambda: click_boton(4))
-boton5 = Button(ventana, text = "5", width = 5, height = 2 ,command = lambda: click_boton(5))
-boton6 = Button(ventana, text = "6", width = 5, height = 2 ,command = lambda: click_boton(6))
-boton7 = Button(ventana, text = "7", width = 5, height = 2 ,command = lambda: click_boton(7))
-boton8 = Button(ventana, text = "8", width = 5, height = 2 , command = lambda: click_boton(8))
-boton9 = Button(ventana, text = "9", width = 5, height = 2 ,command = lambda: click_boton(9))
-boton0 = Button(ventana, text = "0", width = 15 , height = 2 , command = lambda: click_boton(0))
+boton1 = Button(ventana, text = "Insertar Contacto", width = 15, height = 2 , command = lambda: insertar(nombrecontacto,numerocontacto,correocontacto))
+boton2 = Button(ventana, text = "Buscar por nombre", width = 15, height = 2 ,command = lambda: busquedanombre(nombrecontacto))
+boton3 = Button(ventana, text = "Buscar por numero", width = 15, height = 2 ,command = lambda:busquedanumero(numerocontacto))
+boton4 = Button(ventana, text = "Borrar Contactos", width = 15, height = 2 ,command = lambda: borrar_Cont(nombrecontacto))
+boton5 = Button(ventana, text = "Editar Contactos", width = 15, height = 2 ,command = lambda: actualizarcontacto(nombrecontacto,numerocontacto,correocontacto,contactoid))
 
-
-# boton_borrar  = Button(ventana, text = "AC", width = 5, height = 2, bg="#ff0000" ,command = lambda: borrar())
-# boton_parentesis1 = Button(ventana, text = "(", width = 5, height = 2,command = lambda: click_boton("("))
-# boton_parentesis2 = Button(ventana, text = ")", width = 5, height = 2 ,command = lambda: click_boton(")"))
-# boton_punto = Button(ventana, text = ".", width = 5, height = 2 ,command = lambda: click_boton("."))
-# boton_div = Button(ventana, text = "/", width = 5, height = 2 ,command = lambda: click_boton("/"))
-# boton_mult = Button(ventana, text = "X", width = 5, height = 2 , command = lambda: click_boton("*"))
-# boton_rest = Button(ventana, text = "-", width = 5, height = 2 , command = lambda: click_boton("-"))
-# boton_sum = Button(ventana, text = "+", width = 5, height = 2 ,command = lambda: click_boton("+"))
-# boton_igual = Button(ventana, text = " = ", width = 5, height = 2 ,command = lambda:hacer_operacion())
-
-
+#Ubicacion en pantalla
+boton1.grid(row = 6, column = 0, padx = 5 , pady = 5)
+boton2.grid(row = 6, column = 1, padx = 5 , pady = 5)
+boton3.grid(row = 6, column = 2, padx = 5 , pady = 5)
+boton4.grid(row = 6, column = 3, padx = 5 , pady = 5)
+boton5.grid(row = 6, column = 4, padx = 5 , pady = 5)
 
 mainloop()
