@@ -15,16 +15,34 @@ query2 = """ SELECT * FROM contactos; """
 
 ventana = Tk()
 ventana.title("Agenda VyperCode")
+ventana.geometry("1500x720")
+Marco_menu = Frame(ventana, width = 40, height = 700, bg = "grey")
+
+#opciones
+label0= Label(Marco_menu, text= "Elija una opcion:")
+label1= Label(Marco_menu, text= "Añadir Contactos")
+label2= Label(Marco_menu, text= "Busqueda nombre")
+label3= Label(Marco_menu, text= "Buscar por ID")
+label4= Label(Marco_menu, text= "Borrar contactos")
+label5= Label(Marco_menu, text= "Editar Contactos")
+
+#Entrada de texto
+e_texto = Entry(Marco_menu, font = ("arial 20"))
 
 
-#funciones tkinter
+i = 0
+
+
+# funciones tkinter
 def click_boton(valor):
     global i
     e_texto.insert(i, valor)
     i += 1
 
-#funciones
+# funciones
 def insertar (nombrecontacto,numerocontacto,correocontacto):
+   
+
    query1 = """ INSERT INTO contactos(nombrecontacto, numerocontacto, correocontacto) VALUES (?,?,?); """
    info_tupla = (nombrecontacto,numerocontacto,correocontacto)
    cursor.execute(query1, info_tupla)
@@ -52,19 +70,30 @@ def actualizarcontacto(nombrecontacto,numerocontacto,correocontacto,contactoid):
    cursor.execute(query6,[nombrecontacto,numerocontacto,correocontacto,contactoid])
    con.commit()
 
-#Botones
+# def aceptar():
 
-boton1 = Button(ventana, text = "Insertar Contacto", width = 15, height = 2 , command = lambda: insertar(nombrecontacto,numerocontacto,correocontacto))
-boton2 = Button(ventana, text = "Buscar por nombre", width = 15, height = 2 ,command = lambda: busquedanombre(nombrecontacto))
-boton3 = Button(ventana, text = "Buscar por numero", width = 15, height = 2 ,command = lambda:busquedanumero(numerocontacto))
-boton4 = Button(ventana, text = "Borrar Contactos", width = 15, height = 2 ,command = lambda: borrar_Cont(nombrecontacto))
-boton5 = Button(ventana, text = "Editar Contactos", width = 15, height = 2 ,command = lambda: actualizarcontacto(nombrecontacto,numerocontacto,correocontacto,contactoid))
+# def salir():
+# Botones
+boton1 = Button(Marco_menu, text = "Aceptar", width = 15, height = 2 , command = lambda: busquedanombre())
+boton2 = Button(Marco_menu, text = "Salir", width = 15, height = 2 , command = lambda: borrar_Cont())
 
-#Ubicacion en pantalla
-boton1.grid(row = 6, column = 0, padx = 5 , pady = 5)
-boton2.grid(row = 6, column = 1, padx = 5 , pady = 5)
-boton3.grid(row = 6, column = 2, padx = 5 , pady = 5)
-boton4.grid(row = 6, column = 3, padx = 5 , pady = 5)
-boton5.grid(row = 6, column = 4, padx = 5 , pady = 5)
+    
+
+# Ubicacion en pantalla
+Marco_menu.grid(row = 4, column = 9, padx = 20, pady = 50) 
+e_texto.grid(row = 5, column = 0, padx = 50, pady =5)
+boton1.grid(row = 6, column = 1, padx = 5 , pady = 5)
+boton2.grid(row = 6, column = 2, padx = 5 , pady = 5)
+#labels ubicacion
+label0.grid(row = 4, column = 0, padx = 5 , pady = 5)
+label1.grid(row = 4, column = 1, padx = 5 , pady = 5)
+label2.grid(row = 4, column = 2, padx = 5 , pady = 5)
+label3.grid(row = 4, column = 3, padx = 5 , pady = 5)
+label4.grid(row = 4, column = 4, padx = 5 , pady = 5)
+label5.grid(row = 4, column = 5, padx = 5 , pady = 5)
+
+
+
 
 mainloop()
+
