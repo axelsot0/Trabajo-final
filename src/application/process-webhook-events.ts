@@ -4,6 +4,7 @@ import type { WebhookEvent } from '../domain/webhook-event.ts';
 import type { Clock } from '../ports/clock.ts';
 import type { WebhookEventRepository } from '../ports/repositories.ts';
 import type { ReceiveCustomerMessage } from './receive-customer-message.ts';
+import type { ReconcileEcho } from './reconcile-echo.ts';
 
 export interface ProcessSummary {
   claimed: number;
@@ -15,6 +16,7 @@ export interface ProcessSummary {
 export interface ProcessDeps {
   webhookEvents: WebhookEventRepository;
   receiveCustomerMessage: ReceiveCustomerMessage;
+  reconcileEcho: ReconcileEcho;
   clock: Clock;
   maxAttempts?: number;
 }
@@ -78,7 +80,21 @@ export class ProcessPendingWebhookEvents {
           // Los botones de Instagram no forman parte del MVP; se conserva el evento.
           await webhookEvents.markIgnored(event.id, 'postback_not_supported', nowUtc);
           return 'ignored';
-        case 'echo':
+        case 'echo': {
+          const outcome = await this.deps.reconcileEcho.execute({
+            igAccountUserId: inbound.igAccountUserId,
+            recipientScopedId: inbound.recipientScopedId,
+            mid: inbound.mid,
+            timestampMs: inbound.timestampMs,
+            text: inbound.text,
+          });
+          if (outcome === 'unknown_account' || outcome === 'no_conversation') {
+            await webhookEvents.markIgnored(event.id, `echo_${outcome}`, nowUtc);
+            return 'ignored';
+          }
+          await webhookEvents.markDone(event.id, nowUtc);
+          return 'done';
+        }
         case 'read':
         case 'reaction':
         case 'unknown':

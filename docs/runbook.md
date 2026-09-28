@@ -31,7 +31,11 @@ Nunca en `wrangler.jsonc`, frontend, SQL, URL, logs ni capturas. Localmente van 
 ## Vigilancia diaria
 
 - Eventos pendientes en `webhook_events` con `process_status != 'done'`.
-- Errores de Meta/Telegram en `outbox` (status `failed`, `attempts`).
+- Errores de Meta/Telegram en `outbox` (status `failed`, `attempts`, `last_error_code`).
+- Envíos con acuse incierto: `outbox.status = 'uncertain'`. El cron los concilia consultando
+  ecos y la Conversations API; si pasan 24 h sin resolverse quedan `failed` con
+  `unreconciled_timeout` y hay que revisarlos a mano. Nunca reenviar manualmente sin
+  comprobar el DM real.
 - Validez del token de Instagram (`ig_accounts.last_token_check_at`).
 - Cupo de Worker, D1 y Workers AI en el panel de Cloudflare.
 - Conversaciones cerca del cierre de ventana y mensajes sin respuesta.

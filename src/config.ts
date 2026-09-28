@@ -44,11 +44,27 @@ export function requireSecret(env: Env, name: SecretName): string {
   return value;
 }
 
-export type SecretName =
-  | 'META_APP_SECRET'
-  | 'META_VERIFY_TOKEN'
-  | 'META_ACCESS_TOKEN'
-  | 'TELEGRAM_BOT_TOKEN'
-  | 'TELEGRAM_WEBHOOK_SECRET'
-  | 'AI_EXTERNAL_ENDPOINT'
-  | 'AI_EXTERNAL_API_KEY';
+export const SECRET_NAMES = [
+  'META_APP_SECRET',
+  'META_VERIFY_TOKEN',
+  'META_ACCESS_TOKEN',
+  'TELEGRAM_BOT_TOKEN',
+  'TELEGRAM_WEBHOOK_SECRET',
+  'AI_EXTERNAL_ENDPOINT',
+  'AI_EXTERNAL_API_KEY',
+] as const;
+
+export type SecretName = (typeof SECRET_NAMES)[number];
+
+export function isSecretName(value: string): value is SecretName {
+  return (SECRET_NAMES as readonly string[]).includes(value);
+}
+
+/**
+ * Resuelve `ig_accounts.token_reference` (nombre de secreto) al token. Una referencia
+ * fuera de la lista conocida se trata como secreto no configurado.
+ */
+export function resolveTokenReference(env: Env, reference: string): string {
+  if (!isSecretName(reference)) throw new MissingSecretError(reference);
+  return requireSecret(env, reference);
+}

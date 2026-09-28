@@ -1,5 +1,5 @@
 import type { Id } from '../../domain/ids.ts';
-import type { Message } from '../../domain/message.ts';
+import type { DeliveryStatus, Message } from '../../domain/message.ts';
 import type { MessageRepository } from '../../ports/repositories.ts';
 import { toMessage, type MessageRow } from './rows.ts';
 
@@ -42,6 +42,35 @@ export class D1MessageRepository implements MessageRepository {
       .bind(conversationId, limit)
       .all<MessageRow>();
     return results.map(toMessage).reverse();
+  }
+
+  async updateDelivery(
+    id: Id,
+    deliveryStatus: DeliveryStatus,
+    externalMessageId: string | null,
+  ): Promise<void> {
+    await this.db
+      .prepare(
+        `UPDATE messages
+         SET delivery_status = ?2,
+             external_message_id = COALESCE(?3, external_message_id)
+         WHERE id = ?1`,
+      )
+      .bind(id, deliveryStatus, externalMessageId)
+      .run();
+  }
+
+  async listUnconfirmedOutbound(conversationId: Id): Promise<Message[]> {
+    const { results } = await this.db
+      .prepare(
+        `SELECT * FROM messages
+         WHERE conversation_id = ?1 AND direction = 'outbound'
+           AND delivery_status IN ('uncertain', 'queued')
+         ORDER BY ingested_at_utc DESC`,
+      )
+      .bind(conversationId)
+      .all<MessageRow>();
+    return results.map(toMessage);
   }
 
   private insertStatement(m: Message, verb: 'INSERT' | 'INSERT OR IGNORE'): D1PreparedStatement {

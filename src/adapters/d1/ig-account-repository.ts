@@ -1,5 +1,6 @@
 import type { Id } from '../../domain/ids.ts';
-import type { IgAccount } from '../../domain/ig-account.ts';
+import type { IgAccount, IgAccountStatus } from '../../domain/ig-account.ts';
+import type { IsoUtc } from '../../domain/time.ts';
 import type { IgAccountRepository } from '../../ports/repositories.ts';
 import { bool, toIgAccount, type IgAccountRow } from './rows.ts';
 
@@ -40,6 +41,13 @@ export class D1IgAccountRepository implements IgAccountRepository {
         account.lastTokenCheckAtUtc,
         account.createdAtUtc,
       )
+      .run();
+  }
+
+  async setStatus(id: Id, status: IgAccountStatus, checkedAtUtc: IsoUtc): Promise<void> {
+    await this.db
+      .prepare('UPDATE ig_accounts SET status = ?2, last_token_check_at_utc = ?3 WHERE id = ?1')
+      .bind(id, status, checkedAtUtc)
       .run();
   }
 }

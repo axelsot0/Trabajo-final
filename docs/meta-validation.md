@@ -22,8 +22,12 @@ del plan.
 
 ## Versión de API y cuerpo exacto
 
-- Versión de Graph API usada: `pendiente` (configurar en `META_GRAPH_VERSION`).
-- Cuerpo de envío verificado contra la colección oficial de Postman: `pendiente`.
+- Versión de Graph API usada: `v23.0` por defecto en `wrangler.jsonc` (`META_GRAPH_VERSION`); confirmar la vigente antes del paso 4 real.
+- Endpoint de envío implementado: `POST https://graph.instagram.com/{version}/{ig_user_id}/messages` con
+  `{"recipient":{"id":"<IGSID>"},"message":{"text":"..."}}` y `Authorization: Bearer <token>`; para
+  Human Agent se añade `"messaging_type":"MESSAGE_TAG","tag":"HUMAN_AGENT"`. Respuesta esperada:
+  `{"recipient_id":"...","message_id":"..."}`. Cuerpo verificado contra la colección oficial de Postman: `pendiente`.
+- Timeout del adaptador: 10 s. Un timeout se trata como acuse incierto y se concilia (ecos + H11) antes de reintentar.
 
 ## Referencias
 

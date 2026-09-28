@@ -146,13 +146,16 @@ describe('POST /webhooks/meta (recepción)', () => {
       },
     ]);
     expect((await deliver(await signedMetaRequest(payload))).status).toBe(200);
+    // Sin conversación previa con ese cliente, el eco no puede enlazarse y se ignora.
     expect(await repos.webhookEvents.countByStatus()).toMatchObject({
       ignored: 2,
       pending: 0,
       done: 0,
     });
     await expect(repos.messages.findByExternalId('mid.echo')).resolves.toBeNull();
-    expect((await repos.webhookEvents.findByKey('meta:mid.echo'))?.errorCode).toBe('echo');
+    expect((await repos.webhookEvents.findByKey('meta:mid.echo'))?.errorCode).toBe(
+      'echo_no_conversation',
+    );
   });
 
   it('procesa varios eventos de un mismo lote en una sola conversación por cliente', async () => {

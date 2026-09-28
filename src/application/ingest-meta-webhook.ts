@@ -15,9 +15,13 @@ export interface IngestResult {
   ignored: number;
 }
 
-/** Los ecos, lecturas y reacciones se registran como `ignored` con su tipo; no se procesan. */
+/**
+ * Mensajes y postbacks se procesan; los ecos también, porque confirman envíos propios y
+ * registran respuestas hechas desde la app de Instagram. Lecturas y reacciones se
+ * conservan como `ignored` con su tipo.
+ */
 function isProcessable(event: MetaInboundEvent): boolean {
-  return event.kind === 'message' || event.kind === 'postback';
+  return event.kind === 'message' || event.kind === 'postback' || event.kind === 'echo';
 }
 
 /**

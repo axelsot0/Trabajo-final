@@ -3,8 +3,9 @@ import type { Conversation, ConversationMode, ModeChange } from '../domain/conve
 import type { Customer } from '../domain/customer.ts';
 import type { Employee } from '../domain/employee.ts';
 import type { Id } from '../domain/ids.ts';
-import type { IgAccount } from '../domain/ig-account.ts';
-import type { Message } from '../domain/message.ts';
+import type { IgAccount, IgAccountStatus } from '../domain/ig-account.ts';
+import type { DeliveryStatus, Message } from '../domain/message.ts';
+import type { OutboxItem, OutboxStatus } from '../domain/outbox.ts';
 import type { IsoUtc } from '../domain/time.ts';
 import type { WebhookEvent, WebhookProcessStatus } from '../domain/webhook-event.ts';
 
@@ -12,6 +13,7 @@ export interface IgAccountRepository {
   findById(id: Id): Promise<IgAccount | null>;
   findByIgUserId(igUserId: string): Promise<IgAccount | null>;
   insert(account: IgAccount): Promise<void>;
+  setStatus(id: Id, status: IgAccountStatus, checkedAtUtc: IsoUtc): Promise<void>;
 }
 
 export interface EmployeeRepository {
@@ -77,6 +79,14 @@ export interface MessageRepository {
   insertIfNew(message: Message): Promise<{ inserted: boolean }>;
   insert(message: Message): Promise<void>;
   listRecent(conversationId: Id, limit: number): Promise<Message[]>;
+  /** Actualiza el estado de entrega y, si Meta lo confirmó, el `mid` externo. */
+  updateDelivery(
+    id: Id,
+    deliveryStatus: DeliveryStatus,
+    externalMessageId: string | null,
+  ): Promise<void>;
+  /** Mensajes salientes de la conversación con entrega `uncertain` o `queued`, más recientes primero. */
+  listUnconfirmedOutbound(conversationId: Id): Promise<Message[]>;
 }
 
 export interface WebhookEventRepository {
@@ -100,4 +110,21 @@ export interface WebhookEventRepository {
 export interface AuditRepository {
   record(event: AuditEvent): Promise<void>;
   listForEntity(entityType: string, entityId: Id, limit: number): Promise<AuditEvent[]>;
+}
+
+export interface OutboxRepository {
+  enqueue(item: OutboxItem): Promise<void>;
+  findById(id: Id): Promise<OutboxItem | null>;
+  findByMessageId(messageId: Id): Promise<OutboxItem | null>;
+  /** Marca `in_flight` hasta `limit` elementos pendientes cuyo `retry_at_utc` ya venció y los devuelve. */
+  claimDue(nowUtc: IsoUtc, limit: number): Promise<OutboxItem[]>;
+  markSent(id: Id, remoteMessageId: string, nowUtc: IsoUtc): Promise<void>;
+  markFailed(id: Id, errorCode: string, nowUtc: IsoUtc): Promise<void>;
+  markCancelled(id: Id, errorCode: string, nowUtc: IsoUtc): Promise<void>;
+  markUncertain(id: Id, errorCode: string, nowUtc: IsoUtc): Promise<void>;
+  scheduleRetry(id: Id, errorCode: string, retryAtUtc: IsoUtc, nowUtc: IsoUtc): Promise<void>;
+  /** Elementos `uncertain` actualizados antes de `olderThanUtc`, listos para conciliar. */
+  listUncertain(olderThanUtc: IsoUtc, limit: number): Promise<OutboxItem[]>;
+  listByConversation(conversationId: Id, limit: number): Promise<OutboxItem[]>;
+  countByStatus(): Promise<Record<OutboxStatus, number>>;
 }
