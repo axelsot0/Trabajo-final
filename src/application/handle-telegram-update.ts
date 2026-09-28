@@ -197,7 +197,8 @@ export class HandleTelegramUpdate {
       case 'claim':
       case 'close':
       case 'transfer':
-      case 'outcome': {
+      case 'outcome':
+      case 'return_to_ai': {
         const result = await this.deps.actions.handle({ employee, chatId: c.chatId, token });
         await answer(result.notice, result.showAlert ?? false);
         return 'handled';

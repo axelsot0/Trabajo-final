@@ -6,7 +6,10 @@ import type { Message } from '../domain/message.ts';
 import type { AiChatMessage } from '../ports/ai-provider.ts';
 
 /** Versionar cada cambio del prompt para poder comparar resultados (plan §7). */
-export const SALES_PROMPT_VERSION = 'sales-v1';
+export const SALES_PROMPT_VERSION = 'sales-v3';
+
+/** Estado de la conversación desde el punto de vista del asistente. */
+export type Continuation = 'new' | 'ai' | 'after_human';
 
 /** Mensajes previos que se envían como contexto; el resto se omite (minimización). */
 export const PROMPT_HISTORY_LIMIT = 12;
@@ -109,8 +112,15 @@ export interface SalesPromptInput {
   businessName: string;
   catalog: CatalogItem[];
   history: Message[];
-  isFirstAiReply: boolean;
+  continuation: Continuation;
 }
+
+const CONTINUATION_NOTE: Record<Continuation, string> = {
+  new: 'Es el inicio de la conversación.',
+  ai: 'La conversación ya está en curso y ya hablaste con el cliente: continúa sin volver a saludar.',
+  after_human:
+    'La conversación ya está en curso: un agente humano del equipo atendió al cliente (sus mensajes llevan la etiqueta [Agente]) y te devolvió el chat. No saludes ni empieces de cero: continúa de forma natural según lo conversado. Si el agente acordó algo que no está en los datos aprobados (otro precio, entrega o forma de pago), no lo contradigas ni lo repitas: usa handoff_reason "negotiation" si es sobre precio u "out_of_scope" si es otra cosa.',
+};
 
 /** Construye los mensajes para el proveedor. El piso de negociación nunca se incluye. */
 export function buildSalesPrompt(input: SalesPromptInput): AiChatMessage[] {
@@ -130,8 +140,10 @@ REGLAS:
 6. Si pide hablar con una persona: "requested_human". Queja o molestia: "complaint". Temas delicados (salud de una mascota ya comprada, pagos, datos personales): "sensitive". Preguntas que no puedes responder con los datos aprobados: "out_of_scope".
 7. Nunca pidas contraseñas, datos de tarjetas ni documentos.
 8. Escribe en español cálido y natural, máximo 3 frases, como mucho un emoji. No escribas despedidas de traspaso ("te comunico con..."): el sistema las agrega.
-9. ${input.isFirstAiReply ? 'Es tu primera respuesta: preséntate brevemente como el asistente virtual de ' + input.businessName + '.' : 'Ya te presentaste antes; no lo repitas.'}
+9. No saludes ni te presentes, ni digas "Somos ${input.businessName}": el sistema agrega el saludo cuando corresponde. Empieza directo con el contenido. No escribas la etiqueta [Agente].
 10. quantity_requested: número de cachorros que el cliente quiere si lo dijo, si no null. confidence: de 0 a 1, qué tan seguro estás de que tu respuesta es correcta y cumple las reglas.
+
+CONTEXTO: ${CONTINUATION_NOTE[input.continuation]}
 
 Responde SOLO con un objeto JSON con las claves: intent, stage, priority, handoff_reason, quantity_requested, reply, confidence.`;
 
@@ -139,7 +151,12 @@ Responde SOLO con un objeto JSON con las claves: intent, stage, priority, handof
   for (const m of input.history) {
     const content = (m.body ?? '').trim();
     if (content.length === 0) continue;
-    messages.push({ role: m.direction === 'inbound' ? 'user' : 'assistant', content });
+    if (m.direction === 'inbound') messages.push({ role: 'user', content });
+    else
+      messages.push({
+        role: 'assistant',
+        content: m.origin === 'ai' ? content : `[Agente] ${content}`,
+      });
   }
   return messages;
 }

@@ -93,6 +93,7 @@ export function createContainer(env: Env, overrides: ContainerOverrides = {}): C
     tokens: repos.callbackTokens,
     clock,
     timeZone: config.businessTimezone,
+    aiEnabled,
   });
 
   const queueOutboundText = new QueueOutboundText({
@@ -112,6 +113,34 @@ export function createContainer(env: Env, overrides: ContainerOverrides = {}): C
     gateway: instagramGateway,
     clock,
   });
+  const generateAiReply =
+    aiProvider !== null && config.aiMode !== 'off'
+      ? new GenerateAiReply(
+          {
+            conversations: repos.conversations,
+            messages: repos.messages,
+            catalog: repos.catalog,
+            triage: repos.triage,
+            aiReplies: repos.aiReplies,
+            audit: repos.audit,
+            queue: queueOutboundText,
+            dispatch: dispatchOutbox,
+            notifier,
+            provider: aiProvider,
+            clock,
+          },
+          {
+            mode: config.aiMode,
+            model: config.aiModel,
+            dailyLimit: config.aiDailyLimit,
+            minConfidence: config.aiMinConfidence,
+            businessName: config.businessName,
+            timeZone: config.businessTimezone,
+            providerTimeoutMs: 20_000,
+          },
+        )
+      : null;
+
   const agentActions = new AgentActions({
     conversations: repos.conversations,
     employees: repos.employees,
@@ -128,6 +157,7 @@ export function createContainer(env: Env, overrides: ContainerOverrides = {}): C
     employees: repos.employees,
     clock,
     defaultCurrency: config.defaultCurrency,
+    generateAiReply,
   };
   const agentTextHandler = new TelegramAgentTextHandler(handlerDeps);
   const actionHandler = new TelegramActionHandler(handlerDeps, agentTextHandler);
@@ -157,32 +187,6 @@ export function createContainer(env: Env, overrides: ContainerOverrides = {}): C
     },
     { aiEnabled },
   );
-  const generateAiReply =
-    aiProvider !== null && config.aiMode !== 'off'
-      ? new GenerateAiReply(
-          {
-            conversations: repos.conversations,
-            messages: repos.messages,
-            catalog: repos.catalog,
-            triage: repos.triage,
-            aiReplies: repos.aiReplies,
-            audit: repos.audit,
-            queue: queueOutboundText,
-            dispatch: dispatchOutbox,
-            notifier,
-            provider: aiProvider,
-            clock,
-          },
-          {
-            mode: config.aiMode,
-            model: config.aiModel,
-            dailyLimit: config.aiDailyLimit,
-            minConfidence: config.aiMinConfidence,
-            businessName: config.businessName,
-            providerTimeoutMs: 20_000,
-          },
-        )
-      : null;
 
   const reconcileEcho = new ReconcileEcho({
     igAccounts: repos.igAccounts,

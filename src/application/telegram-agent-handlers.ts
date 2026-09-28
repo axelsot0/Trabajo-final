@@ -7,6 +7,7 @@ import type { Clock } from '../ports/clock.ts';
 import type { EmployeeRepository, TelegramLinkRepository } from '../ports/repositories.ts';
 import type { InlineButton } from '../ports/telegram-gateway.ts';
 import type { ActionFailure, AgentActions } from './agent-actions.ts';
+import type { GenerateAiReply } from './generate-ai-reply.ts';
 import type { ActionHandler, AgentTextHandler } from './handle-telegram-update.ts';
 import type { SendAgentReply } from './send-agent-reply.ts';
 import { shortId } from './telegram-cards.ts';
@@ -20,6 +21,8 @@ export interface TelegramAgentHandlerDeps {
   employees: EmployeeRepository;
   clock: Clock;
   defaultCurrency: string;
+  /** Para responder en el acto si el cliente quedó esperando al devolver el chat a la IA. */
+  generateAiReply?: GenerateAiReply | null;
 }
 
 const replyOutcomeText: Record<string, string> = {
@@ -254,6 +257,28 @@ export class TelegramActionHandler implements ActionHandler {
             ? 'Transferida. El agente recibió la tarjeta.'
             : 'Transferida. El agente aún no inició el bot; la verá en /mischats.',
         };
+      }
+      case 'return_to_ai': {
+        const generate = this.deps.generateAiReply;
+        if (generate === undefined || generate === null) {
+          return { notice: 'La IA está apagada (AI_MODE=off).', showAlert: true };
+        }
+        const result = await this.deps.actions.returnToAi(employee, conversationId);
+        if (!result.ok) return { notice: closeFailureText[result.reason], showAlert: true };
+        // Si el cliente espera respuesta, la IA contesta ya con todo el historial; si no,
+        // responde a su próximo mensaje.
+        const outcome = await generate.execute(conversationId);
+        const detail =
+          outcome === 'sent'
+            ? 'La IA respondió al último mensaje del cliente.'
+            : outcome === 'escalated'
+              ? 'La IA volvió a pasar el chat a humano (revisa la alerta).'
+              : 'La IA responderá al próximo mensaje del cliente.';
+        await this.deps.notifier.tell(
+          chatId,
+          `#${shortId(conversationId)} devuelta a la IA. ${detail}`,
+        );
+        return { notice: 'Devuelta a la IA.' };
       }
       case 'view':
       case 'chats_page':

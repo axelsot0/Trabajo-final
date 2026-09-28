@@ -14,7 +14,14 @@ export interface TelegramMessageLink {
 
 /** Acciones que un botón inline puede disparar. Las de gestión llegan en fases posteriores. */
 export type CallbackAction =
-  'view' | 'chats_page' | 'mychats_page' | 'claim' | 'close' | 'transfer' | 'outcome';
+  | 'view'
+  | 'chats_page'
+  | 'mychats_page'
+  | 'claim'
+  | 'close'
+  | 'transfer'
+  | 'outcome'
+  | 'return_to_ai';
 
 export interface CallbackToken {
   token: string;

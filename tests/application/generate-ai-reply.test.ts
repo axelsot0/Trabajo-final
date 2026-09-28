@@ -107,14 +107,15 @@ async function onlyConversation() {
 const ownerTexts = () => telegram.sent.filter((m) => m.chatId === OWNER_TG).map((m) => m.text);
 
 describe('GenerateAiReply', () => {
-  it('responde sola con el precio aprobado, se presenta y registra triaje', async () => {
+  it('responde sola con el precio aprobado, saluda según la hora y registra triaje', async () => {
     await customerSays('Hola, ¿cuánto cuesta un yorkie?');
     aiSays();
     await container.processPendingWebhookEvents.run();
 
     expect(instagram.sent).toHaveLength(1);
     expect(instagram.sent[0]?.text).toContain('RD$21,000');
-    expect(instagram.sent[0]?.text).toMatch(/asistente virtual de Yorki Cuties/);
+    expect(instagram.sent[0]?.text).toMatch(/^Buen día\. /);
+    expect(instagram.sent[0]?.text).not.toMatch(/asistente virtual/);
 
     const conversation = await onlyConversation();
     expect(conversation).toMatchObject({ mode: 'BOT', intent: 'precio', stage: 'interesado' });
@@ -128,15 +129,15 @@ describe('GenerateAiReply', () => {
     expect(ownerTexts()).toHaveLength(0);
   });
 
-  it('la segunda respuesta no repite la presentación', async () => {
+  it('la segunda respuesta no vuelve a saludar', async () => {
     await customerSays('Hola');
-    aiSays({ intent: 'saludo', reply: '¡Hola! Tenemos yorkies de 2 meses. 🐶' });
+    aiSays({ intent: 'saludo', reply: 'Tenemos yorkies de 2 meses. 🐶' });
     await container.processPendingWebhookEvents.run();
     await customerSays('¿Y cuánto cuestan?');
     aiSays({ reply: 'Cuestan RD$21,000 cada uno.' });
     await container.processPendingWebhookEvents.run();
     expect(instagram.sent.map((s) => s.text)).toEqual([
-      'Hola, soy el asistente virtual de Yorki Cuties. ¡Hola! Tenemos yorkies de 2 meses. 🐶',
+      'Buen día. Tenemos yorkies de 2 meses. 🐶',
       'Cuestan RD$21,000 cada uno.',
     ]);
   });
@@ -147,9 +148,7 @@ describe('GenerateAiReply', () => {
     aiSays({ reply: 'Te lo dejo en RD$19,000', stage: 'objecion' });
     await container.processPendingWebhookEvents.run();
 
-    expect(instagram.sent.map((s) => s.text)).toEqual([
-      `Hola, soy el asistente virtual de Yorki Cuties. ${HOLDING_TEXT.sales}`,
-    ]);
+    expect(instagram.sent.map((s) => s.text)).toEqual([`Buen día. ${HOLDING_TEXT.sales}`]);
     const conversation = await onlyConversation();
     expect(conversation).toMatchObject({
       mode: 'PENDING_HUMAN',
@@ -187,9 +186,7 @@ describe('GenerateAiReply', () => {
     ai.respondWith(new Error('upstream 503'));
     await container.processPendingWebhookEvents.run();
 
-    expect(instagram.sent.map((s) => s.text)).toEqual([
-      `Hola, soy el asistente virtual de Yorki Cuties. ${HOLDING_TEXT.generic}`,
-    ]);
+    expect(instagram.sent.map((s) => s.text)).toEqual([`Buen día. ${HOLDING_TEXT.generic}`]);
     expect(await onlyConversation()).toMatchObject({
       mode: 'PENDING_HUMAN',
       modeReason: 'ai_unavailable',
@@ -201,9 +198,7 @@ describe('GenerateAiReply', () => {
     await customerSays('Hola');
     ai.respondWith('Claro que sí, te los regalo');
     await container.processPendingWebhookEvents.run();
-    expect(instagram.sent.map((s) => s.text)).toEqual([
-      `Hola, soy el asistente virtual de Yorki Cuties. ${HOLDING_TEXT.generic}`,
-    ]);
+    expect(instagram.sent.map((s) => s.text)).toEqual([`Buen día. ${HOLDING_TEXT.generic}`]);
     expect((await onlyConversation()).mode).toBe('PENDING_HUMAN');
   });
 
@@ -304,5 +299,70 @@ describe('GenerateAiReply', () => {
     const summary = await runSweep(env, container);
     expect(summary.aiAttempted).toBe(1);
     expect(instagram.sent).toHaveLength(1);
+  });
+
+  describe('devolver a la IA desde Telegram', () => {
+    async function escalateAndClaim(customerText: string) {
+      await customerSays(customerText);
+      aiSays({ reply: 'Te lo dejo en RD$19,000' });
+      await container.processPendingWebhookEvents.run();
+      const conversation = await onlyConversation();
+      const owner = await repos.employees.findByTelegramUserId(OWNER_TG);
+      if (owner === null) throw new Error('sin owner');
+      await container.agentActions.claim(owner, conversation.id);
+      return { conversation, owner };
+    }
+
+    async function pressReturnToAi(conversationId: string) {
+      const owner = await repos.employees.findByTelegramUserId(OWNER_TG);
+      if (owner === null) throw new Error('sin owner');
+      await container.notifier.sendCard(owner.id, conversationId, 'card');
+      const card = telegram.lastTo(OWNER_TG);
+      const button = card?.inlineKeyboard?.flat().find((b) => b.text === '🤖 Devolver a IA');
+      expect(button).toBeDefined();
+      await container.handleTelegramUpdate.execute({
+        updateId: 1,
+        message: null,
+        callback: {
+          id: 'cb-1',
+          fromId: OWNER_TG,
+          chatId: OWNER_TG,
+          messageId: card?.messageId ?? 0,
+          data: button?.callbackData ?? null,
+        },
+      });
+    }
+
+    it('retoma con el historial, sin saludar, marcando los mensajes del agente', async () => {
+      const { conversation, owner } = await escalateAndClaim('¿Me lo dejas en 17 mil?');
+      await container.sendAgentReply.execute(owner, conversation.id, 'Lo menos es 20 mil, amigo');
+      await pressReturnToAi(conversation.id);
+      // El último mensaje es del agente: la IA espera al cliente.
+      expect(ai.requests).toHaveLength(1);
+      expect((await onlyConversation()).mode).toBe('BOT');
+
+      await customerSays('Ok, ¿y de qué edad son?');
+      aiSays({ intent: 'otro', reply: 'Tienen 2 meses de nacidos. 🐶' });
+      await container.processPendingWebhookEvents.run();
+
+      expect(instagram.sent.at(-1)?.text).toBe('Tienen 2 meses de nacidos. 🐶');
+      const request = ai.requests.at(-1);
+      expect(request?.messages[0]?.content).toContain('un agente humano del equipo atendió');
+      expect(request?.messages.map((m) => m.content)).toContain(
+        '[Agente] Lo menos es 20 mil, amigo',
+      );
+    });
+
+    it('si el cliente quedó esperando, la IA contesta al devolverle el chat', async () => {
+      const { conversation } = await escalateAndClaim('¿Me lo dejas en 17 mil?');
+      await customerSays('¿Siguen disponibles?');
+      await container.processPendingWebhookEvents.run(); // en HUMAN: la IA no interviene
+      expect(ai.requests).toHaveLength(1);
+
+      aiSays({ intent: 'disponibilidad', reply: 'Sí, quedan 5 yorkies disponibles.' });
+      await pressReturnToAi(conversation.id);
+      expect(instagram.sent.at(-1)?.text).toBe('Sí, quedan 5 yorkies disponibles.');
+      expect(ownerTexts().join('\n')).toContain('devuelta a la IA. La IA respondió');
+    });
   });
 });

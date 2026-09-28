@@ -26,6 +26,36 @@ function expectDomainError(fn: () => unknown, code: DomainError['code']): void {
 }
 
 describe('transition', () => {
+  it('devolver a la IA: el agente asignado o un owner, sin cerrar la conversación', () => {
+    const expected = {
+      mode: 'BOT',
+      modeReason: 'agent_return_to_ai',
+      assignedEmployeeId: null,
+      closed: false,
+    };
+    expect(
+      transition(human, { type: 'return_to_ai', employeeId: 'emp-1', isOwner: false }),
+    ).toEqual(expected);
+    expect(
+      transition(human, { type: 'return_to_ai', employeeId: 'owner-9', isOwner: true }),
+    ).toEqual(expected);
+    expect(
+      transition(pending, { type: 'return_to_ai', employeeId: 'emp-2', isOwner: false }),
+    ).toEqual(expected);
+    expectDomainError(
+      () => transition(human, { type: 'return_to_ai', employeeId: 'emp-2', isOwner: false }),
+      'forbidden',
+    );
+    expectDomainError(
+      () => transition(closed, { type: 'return_to_ai', employeeId: 'emp-1', isOwner: true }),
+      'conversation_closed',
+    );
+    expectDomainError(
+      () => transition(bot, { type: 'return_to_ai', employeeId: 'emp-1', isOwner: true }),
+      'invalid_transition',
+    );
+  });
+
   it('BOT → PENDING_HUMAN al escalar, conservando el motivo', () => {
     const change = transition(bot, { type: 'escalate', reason: 'low_confidence' });
     expect(change).toEqual({

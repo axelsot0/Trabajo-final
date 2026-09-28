@@ -26,6 +26,7 @@ export type ModeReason =
   | 'agent_transfer'
   | 'agent_release'
   | 'agent_close'
+  | 'agent_return_to_ai'
   | 'customer_reopen';
 
 export type Priority = 'alta' | 'media' | 'baja';
@@ -58,6 +59,8 @@ export type ConversationEvent =
   | { type: 'transfer'; fromEmployeeId: Id; toEmployeeId: Id }
   | { type: 'release'; employeeId: Id }
   | { type: 'close'; employeeId: Id | null }
+  /** Un agente devuelve la conversación a la IA sin cerrarla; el historial se conserva. */
+  | { type: 'return_to_ai'; employeeId: Id; isOwner: boolean }
   | { type: 'customer_message'; reopenMode: 'BOT' | 'PENDING_HUMAN' };
 
 export type EscalationReason = Extract<
@@ -153,6 +156,30 @@ export function transition(
         assertAssignedTo(current, event.employeeId);
       }
       return { mode: 'CLOSED', modeReason: 'agent_close', assignedEmployeeId: null, closed: true };
+    }
+    case 'return_to_ai': {
+      if (current.mode === 'PENDING_HUMAN') {
+        return {
+          mode: 'BOT',
+          modeReason: 'agent_return_to_ai',
+          assignedEmployeeId: null,
+          closed: false,
+        };
+      }
+      if (current.mode !== 'HUMAN') {
+        throw new DomainError(
+          current.mode === 'CLOSED' ? 'conversation_closed' : 'invalid_transition',
+          'Solo una conversación en atención humana puede devolverse a la IA',
+        );
+      }
+      // Un owner puede devolver cualquier conversación; un agente solo la suya.
+      if (!event.isOwner) assertAssignedTo(current, event.employeeId);
+      return {
+        mode: 'BOT',
+        modeReason: 'agent_return_to_ai',
+        assignedEmployeeId: null,
+        closed: false,
+      };
     }
     case 'customer_message': {
       if (current.mode !== 'CLOSED') {

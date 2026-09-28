@@ -15,6 +15,8 @@ import {
 } from '../domain/catalog.ts';
 import { transition, type Conversation, type EscalationReason } from '../domain/conversation.ts';
 import { newId, type Id } from '../domain/ids.ts';
+import { localParts } from '../domain/local-time.ts';
+import type { Message } from '../domain/message.ts';
 import { toIsoUtc } from '../domain/time.ts';
 import type { AiProvider } from '../ports/ai-provider.ts';
 import type { Clock } from '../ports/clock.ts';
@@ -30,6 +32,7 @@ import type { DispatchOutbox } from './dispatch-outbox.ts';
 import type { QueueOutboundText } from './queue-outbound-text.ts';
 import {
   buildSalesPrompt,
+  type Continuation,
   parseSalesReply,
   PROMPT_HISTORY_LIMIT,
   SALES_PROMPT_VERSION,
@@ -43,6 +46,7 @@ export interface GenerateAiReplyConfig {
   dailyLimit: number;
   minConfidence: number;
   businessName: string;
+  timeZone: string;
   providerTimeoutMs: number;
 }
 
@@ -68,6 +72,7 @@ export type GenerateOutcome =
   | 'skipped_superseded'
   | 'skipped_claimed'
   | 'skipped_not_text'
+  | 'skipped_answered'
   | 'error';
 
 type HandoffCode = Extract<AiAction, { kind: 'handoff' }>['handoff'] | 'ai_unavailable' | 'budget';
@@ -115,6 +120,12 @@ export class GenerateAiReply {
     if (latest.contentType !== 'text' || (latest.body ?? '').trim().length === 0) {
       return 'skipped_not_text';
     }
+    // Ya se le respondió (p. ej. un agente escribió y luego devolvió el chat a la IA).
+    // Se compara con nuestro reloj de ingesta: la hora de Meta no es comparable con él.
+    const answered = (await messages.listRecent(conversationId, 20)).some(
+      (m) => m.direction === 'outbound' && m.ingestedAtUtc > latest.ingestedAtUtc,
+    );
+    if (answered) return 'skipped_answered';
 
     const recordId = newId();
     const claimed = await aiReplies.claim({
@@ -204,7 +215,9 @@ export class GenerateAiReply {
     const startOfDay = new Date(clock.now());
     startOfDay.setUTCHours(0, 0, 0, 0);
     const used = await aiReplies.countProviderCallsSince(toIsoUtc(startOfDay));
-    const isFirstAiReply = (await messages.countOutboundByOrigin(conversation.id, 'ai')) === 0;
+    const history = await messages.listRecent(conversation.id, PROMPT_HISTORY_LIMIT);
+    const continuation = await this.continuationOf(conversation, history);
+    const opening: Opening = continuation === 'new' ? 'greet' : 'none';
     if (used >= this.config.dailyLimit) {
       await this.holdAndEscalate(
         conversation,
@@ -213,17 +226,16 @@ export class GenerateAiReply {
         items,
         recordId,
         'budget',
-        isFirstAiReply,
+        opening,
       );
       return 'escalated';
     }
 
-    const history = await messages.listRecent(conversation.id, PROMPT_HISTORY_LIMIT);
     const prompt = buildSalesPrompt({
       businessName: this.config.businessName,
       catalog: items,
       history,
-      isFirstAiReply,
+      continuation,
     });
 
     const started = Date.now();
@@ -255,7 +267,7 @@ export class GenerateAiReply {
         items,
         recordId,
         'provider_error',
-        isFirstAiReply,
+        opening,
       );
       return 'escalated';
     }
@@ -274,7 +286,7 @@ export class GenerateAiReply {
         items,
         recordId,
         'invalid_output',
-        isFirstAiReply,
+        opening,
       );
       return 'escalated';
     }
@@ -297,7 +309,7 @@ export class GenerateAiReply {
     await this.recordTriage(conversation.id, triggerId, assessment, action);
 
     if (action.kind === 'reply') {
-      const text = withDisclosure(action.text, isFirstAiReply, this.config.businessName);
+      const text = withOpening(action.text, opening, this.greeting());
       const sent = await this.send(conversation.id, text);
       if (sent === null) {
         await this.escalate(
@@ -324,7 +336,7 @@ export class GenerateAiReply {
     if (action.customerText !== null) {
       replyMessageId = await this.send(
         conversation.id,
-        withDisclosure(action.customerText, isFirstAiReply, this.config.businessName),
+        withOpening(action.customerText, opening, this.greeting()),
       );
     }
     await this.escalate(
@@ -352,14 +364,14 @@ export class GenerateAiReply {
     items: CatalogItem[],
     recordId: Id,
     decisionCode: string,
-    isFirstAiReply: boolean,
+    opening: Opening,
   ): Promise<void> {
     const replyMessageId =
       this.config.mode === 'review'
         ? null
         : await this.send(
             conversation.id,
-            withDisclosure(HOLDING_TEXT.generic, isFirstAiReply, this.config.businessName),
+            withOpening(HOLDING_TEXT.generic, opening, this.greeting()),
           );
     await this.escalate(
       conversation,
@@ -371,6 +383,25 @@ export class GenerateAiReply {
       decisionCode,
       replyMessageId,
     );
+  }
+
+  private greeting(): string {
+    return greetingFor(localParts(toIsoUtc(this.deps.clock.now()), this.config.timeZone).hour);
+  }
+
+  /** ¿Conversación nueva, ya atendida por la IA o retomada después de un agente humano? */
+  private async continuationOf(
+    conversation: Conversation,
+    history: Message[],
+  ): Promise<Continuation> {
+    if (conversation.modeReason === 'agent_return_to_ai') return 'after_human';
+    const outbound = history.filter((m) => m.direction === 'outbound');
+    if (outbound.some((m) => m.origin === 'telegram')) return 'after_human';
+    if (outbound.length > 0) return 'ai';
+    const { messages } = this.deps;
+    const ai = await messages.countOutboundByOrigin(conversation.id, 'ai');
+    const human = await messages.countOutboundByOrigin(conversation.id, 'telegram');
+    return ai + human === 0 ? 'new' : 'ai';
   }
 
   /** Encola y despacha un texto automático. Devuelve el id del mensaje o `null` si se rechazó. */
@@ -396,7 +427,13 @@ export class GenerateAiReply {
     assessment: AiAssessment,
     action: AiAction,
   ): Promise<void> {
-    const priority = action.kind === 'handoff' ? action.priority : assessment.priority;
+    // Prioridad alta se reserva para lo que necesita a una persona.
+    const priority =
+      action.kind === 'handoff'
+        ? action.priority
+        : assessment.priority === 'alta'
+          ? 'media'
+          : assessment.priority;
     await this.deps.triage.insert({
       id: newId(),
       conversationId,
@@ -524,9 +561,20 @@ function pricingGuide(item: CatalogItem): string {
 }
 
 /** Transparencia (plan §7): la primera respuesta automática se identifica como asistente. */
-function withDisclosure(text: string, isFirst: boolean, businessName: string): string {
-  if (!isFirst || /asistente/i.test(text)) return text;
-  return `Hola, soy el asistente virtual de ${businessName}. ${text}`;
+type Opening = 'greet' | 'none';
+
+/**
+ * Primera respuesta de una conversación nueva: saludo corto según la hora local
+ * ("Buen día" por la mañana, "Buenas" el resto). Al continuar, sin saludo.
+ */
+function withOpening(text: string, opening: Opening, greeting: string): string {
+  const clean = text.replace(/\[Agente\]\s*/gi, '').trim();
+  if (opening === 'none' || /^¡?(saludos|buen[oa]s?|buen d[ií]a|hola)\b/i.test(clean)) return clean;
+  return `${greeting}. ${clean}`;
+}
+
+export function greetingFor(hour: number): string {
+  return hour >= 5 && hour < 12 ? 'Buen día' : 'Buenas';
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {

@@ -23,6 +23,8 @@ export interface TelegramNotifierDeps {
   tokens: CallbackTokenRepository;
   clock: Clock;
   timeZone: string;
+  /** Con la IA activa, las tarjetas ofrecen devolver la conversación a la IA. */
+  aiEnabled?: boolean;
 }
 
 export interface ButtonSpec {
@@ -64,6 +66,16 @@ export class TelegramNotifier {
     const conversation = await this.deps.conversations.findById(conversationId);
     if (conversation === null) return [];
     const rows: InlineButton[][] = [];
+    const returnToAi = async (): Promise<InlineButton[]> =>
+      this.deps.aiEnabled === true
+        ? [
+            await this.button(employeeId, {
+              text: '🤖 Devolver a IA',
+              action: 'return_to_ai',
+              conversationId,
+            }),
+          ]
+        : [];
     if (conversation.mode === 'PENDING_HUMAN') {
       rows.push([
         await this.button(employeeId, {
@@ -72,12 +84,15 @@ export class TelegramNotifier {
           conversationId,
           ttlMs: MS_PER_DAY,
         }),
+        ...(await returnToAi()),
       ]);
     } else if (conversation.mode === 'HUMAN' && conversation.assignedEmployeeId === employeeId) {
       rows.push([
         await this.button(employeeId, { text: 'Transferir', action: 'transfer', conversationId }),
         await this.button(employeeId, { text: 'Cerrar', action: 'close', conversationId }),
       ]);
+      const back = await returnToAi();
+      if (back.length > 0) rows.push(back);
     }
     return rows;
   }

@@ -79,6 +79,17 @@ export class AgentActions {
     return this.apply(employee, conversation, { type: 'release', employeeId: employee.id });
   }
 
+  /** Devuelve la conversación a la IA sin cerrarla (owner: cualquiera; agente: la suya). */
+  async returnToAi(employee: Employee, conversationId: Id): Promise<ActionResult> {
+    const conversation = await this.deps.conversations.findById(conversationId);
+    if (conversation === null) return { ok: false, reason: 'not_found' };
+    return this.apply(employee, conversation, {
+      type: 'return_to_ai',
+      employeeId: employee.id,
+      isOwner: employee.role === 'owner',
+    });
+  }
+
   /**
    * Cierra y registra el resultado declarado. Un `owner` puede cerrar cualquier
    * conversación; un agente solo la suya.
