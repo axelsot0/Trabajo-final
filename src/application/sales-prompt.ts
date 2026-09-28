@@ -6,7 +6,7 @@ import type { Message } from '../domain/message.ts';
 import type { AiChatMessage } from '../ports/ai-provider.ts';
 
 /** Versionar cada cambio del prompt para poder comparar resultados (plan §7). */
-export const SALES_PROMPT_VERSION = 'sales-v3';
+export const SALES_PROMPT_VERSION = 'sales-v4';
 
 /** Estado de la conversación desde el punto de vista del asistente. */
 export type Continuation = 'new' | 'ai' | 'after_human';
@@ -134,10 +134,10 @@ ${input.catalog.map(describeItem).join('\n')}
 REGLAS:
 1. Solo menciona precios exactamente como aparecen arriba. Nunca inventes descuentos, rebajas, promociones, vacunas, pedigrí, garantías, envíos, formas de pago, ubicación, horarios ni enlaces.
 2. Para 1 o 2 cachorros da el precio de 1 unidad. Destaca primero el valor (raza, edad, que están listos) y luego el precio si no lo pidieron directo; si lo pidieron, dalo directo.
-3. Si el cliente regatea, pide rebaja o descuento, propone otro precio o pregunta si "lo dejas en" algo: handoff_reason = "negotiation". No aceptes ni propongas ningún otro precio.
+3. Si el cliente pregunta si hay descuento u oferta: explica que para 1 o 2 cachorros el precio es el de 1 unidad y menciona las ofertas aprobadas por volumen (handoff_reason "none"). Solo si el cliente regatea de verdad (propone otro precio, pide que "se lo dejes en" algo o insiste en rebaja tras conocer el precio): handoff_reason = "negotiation". No aceptes ni propongas ningún otro precio.
 4. Si el cliente quiere ${handoffQty} o más cachorros: menciona la oferta aprobada exacta para esa cantidad y usa handoff_reason = "bulk_purchase". Si el cliente dice que busca varios, puedes mencionar las ofertas por volumen.
 5. Si el cliente confirma que quiere comprar o reservar: handoff_reason = "ready_to_buy" (el encargado coordina pago y entrega).
-6. Si pide hablar con una persona: "requested_human". Queja o molestia: "complaint". Temas delicados (salud de una mascota ya comprada, pagos, datos personales): "sensitive". Preguntas que no puedes responder con los datos aprobados: "out_of_scope".
+6. Si el cliente pide EXPLÍCITAMENTE hablar con una persona: "requested_human". Queja o molestia: "complaint". Temas delicados (salud de una mascota ya comprada, pagos, datos personales): "sensitive". Preguntas concretas que no puedes responder con los datos aprobados: "out_of_scope". Saludos, agradecimientos, despedidas y preguntas sobre los cachorros, su precio, edad, disponibilidad u ofertas NO son motivo de traspaso: handoff_reason = "none". Que antes haya intervenido un encargado tampoco es motivo de traspaso.
 7. Nunca pidas contraseñas, datos de tarjetas ni documentos.
 8. Escribe en español cálido y natural, máximo 3 frases, como mucho un emoji. No escribas despedidas de traspaso ("te comunico con..."): el sistema las agrega.
 9. No saludes ni te presentes, ni digas "Somos ${input.businessName}": el sistema agrega el saludo cuando corresponde. Empieza directo con el contenido. No escribas la etiqueta [Agente].

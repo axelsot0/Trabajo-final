@@ -56,6 +56,63 @@ const WORD_NUMBERS: Record<string, number> = {
 export interface RuleSignals {
   reason: Exclude<HandoffReason, 'none'> | null;
   quantity: number | null;
+  /** El mensaje es solo un saludo ("Hola", "Buenas noches"): nunca motivo de traspaso. */
+  greetingOnly: boolean;
+}
+
+const GREETING_WORDS = new Set([
+  'hola',
+  'holaa',
+  'holi',
+  'buenas',
+  'buenos',
+  'buen',
+  'dia',
+  'dias',
+  'día',
+  'días',
+  'tarde',
+  'tardes',
+  'noche',
+  'noches',
+  'saludos',
+  'hey',
+  'que',
+  'qué',
+  'tal',
+  'como',
+  'cómo',
+  'estas',
+  'estás',
+  'esta',
+  'está',
+  'todo',
+  'bien',
+  'klk',
+  'epa',
+  'hello',
+  'hi',
+]);
+
+export function isGreetingOnly(text: string): boolean {
+  const words = text
+    .toLowerCase()
+    .replace(/[^\p{L}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length > 0);
+  return words.length > 0 && words.length <= 6 && words.every((w) => GREETING_WORDS.has(w));
+}
+
+/** Petición explícita de hablar con una persona (el modelo no puede inventarla). */
+export function asksForHuman(text: string): boolean {
+  const t = text.toLowerCase();
+  return (
+    /(hablar|comunic|p[aá]s|atend|contact)\w*\s.{0,30}(persona|humano|encargad|asesor|vendedor|dueñ|jefe|alguien|agente)/.test(
+      t,
+    ) ||
+    /\b(persona real|un humano|ser humano)\b/.test(t) ||
+    /\bno\s+(quiero\s+)?(hablar\s+con\s+)?(un\s+|una\s+)?(bot|robot|m[aá]quina)\b/.test(t)
+  );
 }
 
 /**
@@ -71,25 +128,23 @@ export function detectRuleSignals(
   const text = customerText.toLowerCase();
 
   const quantity = detectQuantity(text);
+  const greetingOnly = isGreetingOnly(customerText);
 
-  if (
-    /(hablar|comunicar|pasar|atender)\w*\s.{0,25}(persona|humano|encargad|asesor|dueñ|alguien)/.test(
-      text,
-    ) ||
-    /\b(persona real|un humano)\b/.test(text)
-  ) {
-    return { reason: 'requested_human', quantity };
-  }
+  if (asksForHuman(customerText)) return { reason: 'requested_human', quantity, greetingOnly };
 
+  // Contraoferta real. Preguntar "¿hacen descuento?" NO es regateo: es la ocasión de
+  // ofrecer los precios por volumen aprobados.
   const offeredUnapproved = extractAmounts(customerText).some((a) => !approvedAmounts.has(a));
   const haggling =
-    /(rebaj|descuent|m[aá]s barat|por menos|en menos|algo menos|[uú]ltimo precio|negociable|precio especial|me lo dej|lo dej[ae]s? en|te (doy|ofrezco|pago)|ofrezco|mejor precio)/.test(
+    /(por menos|en menos|algo menos|[uú]ltimo precio|negociable|me lo dej|lo dej[ae]s? en|te (doy|ofrezco|pago)|ofrezco|reb[aá]j(ame|amelo|amela)\b)/.test(
       text,
     );
-  if (haggling || offeredUnapproved) return { reason: 'negotiation', quantity };
+  if (haggling || offeredUnapproved) return { reason: 'negotiation', quantity, greetingOnly };
 
-  if (quantity !== null && quantity >= handoffMinQty) return { reason: 'bulk_purchase', quantity };
-  return { reason: null, quantity };
+  if (quantity !== null && quantity >= handoffMinQty) {
+    return { reason: 'bulk_purchase', quantity, greetingOnly };
+  }
+  return { reason: null, quantity, greetingOnly };
 }
 
 function detectQuantity(text: string): number | null {
@@ -126,7 +181,15 @@ export interface DecideInput {
   minConfidence: number;
   unapprovedInReply: number[];
   handoffMinQty: number;
+  /** Respuesta fija a un saludo sin más contenido. */
+  greetingReply: string;
+  /** Respuesta cuando se descarta un traspaso inventado por el modelo y su texto no sirve. */
+  fallbackReply: string;
 }
+
+/** Texto que suena a traspaso: no debe salir si al final no se traspasa. */
+const HANDOFF_WORDING =
+  /(encargad|persona del equipo|te comunic|te paso con|te responde en breve)/i;
 
 export const HOLDING_TEXT: Record<'sales' | 'buy' | 'generic', string> = {
   sales: '¡Gracias! Déjame consultarlo con el encargado y te escribimos en breve. 🐶',
@@ -142,7 +205,28 @@ export function decideAiAction(input: DecideInput): AiAction {
   const { assessment, rules } = input;
   const quantity = Math.max(assessment.quantityRequested ?? 0, rules.quantity ?? 0);
 
+  // Un saludo solo nunca se traspasa ni depende del modelo.
+  if (rules.greetingOnly && rules.reason === null) {
+    return input.mode === 'review'
+      ? {
+          kind: 'handoff',
+          reason: 'ai_review_required',
+          handoff: 'review',
+          priority: 'baja',
+          customerText: null,
+          draft: input.greetingReply,
+          salesAlert: false,
+        }
+      : { kind: 'reply', text: input.greetingReply, code: 'auto_reply' };
+  }
+
   let handoff: HandoffReason = assessment.handoffReason;
+  let overridden = false;
+  // "Pidió una persona" solo vale si el cliente lo escribió; el modelo a veces lo inventa.
+  if (handoff === 'requested_human' && rules.reason !== 'requested_human') {
+    handoff = 'none';
+    overridden = true;
+  }
   // Las reglas deterministas ganan cuando detectan algo que el modelo pasó por alto.
   if (rules.reason !== null && (handoff === 'none' || rules.reason === 'negotiation')) {
     handoff = rules.reason;
@@ -153,7 +237,10 @@ export function decideAiAction(input: DecideInput): AiAction {
     handoff = 'none';
   }
 
-  const reply = assessment.reply.trim();
+  let reply = assessment.reply.trim();
+  if (overridden && (reply.length === 0 || HANDOFF_WORDING.test(reply))) {
+    reply = input.fallbackReply;
+  }
 
   if (handoff !== 'none') {
     const salesAlert = salesAlertReasons.has(handoff);
@@ -195,7 +282,7 @@ export function decideAiAction(input: DecideInput): AiAction {
     };
   }
 
-  if (reply.length === 0 || assessment.confidence < input.minConfidence) {
+  if (reply.length === 0 || (!overridden && assessment.confidence < input.minConfidence)) {
     return {
       kind: 'handoff',
       reason: 'low_confidence',

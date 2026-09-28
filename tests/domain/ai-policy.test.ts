@@ -24,13 +24,25 @@ function assessment(overrides: Partial<AiAssessment> = {}): AiAssessment {
   };
 }
 
-const base = { mode: 'auto' as const, minConfidence: 0.6, unapprovedInReply: [], handoffMinQty: 3 };
-const noRules = { reason: null, quantity: null };
+const base = {
+  mode: 'auto' as const,
+  minConfidence: 0.6,
+  unapprovedInReply: [],
+  handoffMinQty: 3,
+  greetingReply: '¿En qué te puedo ayudar? 🐶',
+  fallbackReply: 'Con gusto te ayudo 🐶',
+};
+const noRules = { reason: null, quantity: null, greetingOnly: false };
 
 describe('detectRuleSignals', () => {
   it.each([
     ['¿Me lo dejas en 17 mil?', 'negotiation'],
-    ['¿tienen algún descuento?', 'negotiation'],
+    ['¿tienen algún descuento?', null],
+    ['Y si quiero comprar varios ? Hacen algún descuento?', null],
+    ['Rebájamelo un poco', 'negotiation'],
+    ['pásame con el encargado', 'requested_human'],
+    ['no quiero hablar con un bot', 'requested_human'],
+    ['Hola', null],
     ['te doy 15000 ahora mismo', 'negotiation'],
     ['¿Cuál es el último precio?', 'negotiation'],
     ['quiero hablar con una persona', 'requested_human'],
@@ -56,7 +68,7 @@ describe('decideAiAction', () => {
     const action = decideAiAction({
       ...base,
       assessment: assessment({ reply: 'Te lo dejo en 19 mil' }),
-      rules: { reason: 'negotiation', quantity: null },
+      rules: { reason: 'negotiation', quantity: null, greetingOnly: false },
     });
     expect(action).toMatchObject({
       kind: 'handoff',
@@ -88,7 +100,7 @@ describe('decideAiAction', () => {
     const action = decideAiAction({
       ...base,
       assessment: assessment({ reply: 'Claro, cuestan RD$21,000.' }),
-      rules: { reason: null, quantity: 5 },
+      rules: { reason: null, quantity: 5, greetingOnly: false },
     });
     expect(action).toMatchObject({ kind: 'handoff', reason: 'bulk_purchase' });
   });
@@ -100,6 +112,31 @@ describe('decideAiAction', () => {
       rules: noRules,
     });
     expect(action.kind).toBe('reply');
+  });
+
+  it('un saludo solo se responde con el texto fijo aunque el modelo quiera traspasar', () => {
+    const action = decideAiAction({
+      ...base,
+      assessment: assessment({ handoffReason: 'out_of_scope', reply: 'Si necesitas algo más...' }),
+      rules: detectRuleSignals('Hola, buenas noches', approved, 3),
+    });
+    expect(action).toEqual({
+      kind: 'reply',
+      text: '¿En qué te puedo ayudar? 🐶',
+      code: 'auto_reply',
+    });
+  });
+
+  it('ignora un "pidió una persona" que el cliente nunca escribió', () => {
+    const action = decideAiAction({
+      ...base,
+      assessment: assessment({
+        handoffReason: 'requested_human',
+        reply: 'Una persona del equipo te responde en breve.',
+      }),
+      rules: detectRuleSignals('¿y qué edad tienen?', approved, 3),
+    });
+    expect(action).toEqual({ kind: 'reply', text: 'Con gusto te ayudo 🐶', code: 'auto_reply' });
   });
 
   it('un precio no aprobado en la respuesta bloquea el envío', () => {

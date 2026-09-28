@@ -304,6 +304,8 @@ export class GenerateAiReply {
       minConfidence: this.config.minConfidence,
       unapprovedInReply: unapprovedAmounts(assessment.reply, approved),
       handoffMinQty,
+      greetingReply: greetingReply(items),
+      fallbackReply: FALLBACK_REPLY,
     });
 
     await this.recordTriage(conversation.id, triggerId, assessment, action);
@@ -561,6 +563,19 @@ function pricingGuide(item: CatalogItem): string {
 }
 
 /** Transparencia (plan §7): la primera respuesta automática se identifica como asistente. */
+const FALLBACK_REPLY =
+  'Con gusto te ayudo 🐶 ¿Quieres saber el precio, la disponibilidad o nuestras ofertas?';
+
+/** Respuesta fija a un saludo: invita a preguntar y menciona lo disponible. */
+function greetingReply(items: CatalogItem[]): string {
+  const available = items
+    .filter((i) => i.quantityAvailable > 0)
+    .map((i) => i.description.charAt(0).toLowerCase() + i.description.slice(1));
+  return available.length === 0
+    ? '¿En qué te puedo ayudar? 🐶'
+    : `¿En qué te puedo ayudar? 🐶 Tenemos ${available.join(' y ')} disponibles.`;
+}
+
 type Opening = 'greet' | 'none';
 
 /**

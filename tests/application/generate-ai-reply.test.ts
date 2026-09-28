@@ -130,8 +130,8 @@ describe('GenerateAiReply', () => {
   });
 
   it('la segunda respuesta no vuelve a saludar', async () => {
-    await customerSays('Hola');
-    aiSays({ intent: 'saludo', reply: 'Tenemos yorkies de 2 meses. 🐶' });
+    await customerSays('Hola, ¿tienen yorkies?');
+    aiSays({ intent: 'disponibilidad', reply: 'Tenemos yorkies de 2 meses. 🐶' });
     await container.processPendingWebhookEvents.run();
     await customerSays('¿Y cuánto cuestan?');
     aiSays({ reply: 'Cuestan RD$21,000 cada uno.' });
@@ -140,6 +140,17 @@ describe('GenerateAiReply', () => {
       'Buen día. Tenemos yorkies de 2 meses. 🐶',
       'Cuestan RD$21,000 cada uno.',
     ]);
+  });
+
+  it('un "Hola" tras devolver el chat se responde sin traspasar (caso real del bucle)', async () => {
+    await customerSays('Hola');
+    // El modelo intenta traspasar un saludo: la regla determinista lo impide.
+    aiSays({ handoff_reason: 'requested_human', reply: 'Una persona te responde en breve.' });
+    await container.processPendingWebhookEvents.run();
+    expect(instagram.sent.map((s) => s.text)).toEqual([
+      'Buen día. ¿En qué te puedo ayudar? 🐶 Tenemos yorkshire terrier de 2 meses de nacido disponibles.',
+    ]);
+    expect((await onlyConversation()).mode).toBe('BOT');
   });
 
   it('ante un regateo responde con texto fijo, pasa a humano y avisa con la guía de precios', async () => {
