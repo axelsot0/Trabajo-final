@@ -20,11 +20,15 @@
     {
       "binding": "DB",
       "database_name": "ig-telegram-mvp",
-      // Sustituir por el ID real tras `wrangler d1 create ig-telegram-mvp`.
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "a0bc67ec-78f7-41dd-b88a-8a28f94e0599",
       "migrations_dir": "migrations",
     },
   ],
+  // Barrido de respaldo (`scheduled` → runSweep): reintentos, conciliación de envíos
+  // inciertos y outbox. 1.440 invocaciones/día, dentro del plan Free.
+  "triggers": {
+    "crons": ["* * * * *"],
+  },
   "vars": {
     "APP_ENV": "development",
     "BUSINESS_TIMEZONE": "America/Santo_Domingo",
