@@ -41,14 +41,14 @@ Las decisiones de arquitectura se registran en [`docs/adr/`](docs/adr/).
 
 ## Riesgos principales
 
-| Riesgo | Mitigación en el diseño |
-|---|---|
-| Meta no autoriza DMs de clientes fuera de roles de prueba sin App Review | Gate explícito en el paso 4; resultados en `docs/meta-validation.md`. |
-| Ventana de mensajería de 24 h (7 días con Human Agent, si está habilitado) | Se recalcula elegibilidad justo antes de cada envío; fuera de ventana se espera al cliente. |
-| Cuotas del plan gratuito (Workers, D1, Workers AI) | Límites internos configurables, corte anticipado de IA, alertas al `owner`. |
-| Doble respuesta ante acuse incierto de Meta | Outbox con conciliación antes de reintentar. |
-| Dos agentes toman el mismo chat | `UPDATE ... WHERE mode='PENDING_HUMAN' AND assigned_employee_id IS NULL` y verificación de filas afectadas. |
-| Fuga de secretos o PII | Secretos solo en Worker/GitHub Actions; PII redactada en logs; nada de datos reales en el repo. |
+| Riesgo                                                                     | Mitigación en el diseño                                                                                     |
+| -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Meta no autoriza DMs de clientes fuera de roles de prueba sin App Review   | Gate explícito en el paso 4; resultados en `docs/meta-validation.md`.                                       |
+| Ventana de mensajería de 24 h (7 días con Human Agent, si está habilitado) | Se recalcula elegibilidad justo antes de cada envío; fuera de ventana se espera al cliente.                 |
+| Cuotas del plan gratuito (Workers, D1, Workers AI)                         | Límites internos configurables, corte anticipado de IA, alertas al `owner`.                                 |
+| Doble respuesta ante acuse incierto de Meta                                | Outbox con conciliación antes de reintentar.                                                                |
+| Dos agentes toman el mismo chat                                            | `UPDATE ... WHERE mode='PENDING_HUMAN' AND assigned_employee_id IS NULL` y verificación de filas afectadas. |
+| Fuga de secretos o PII                                                     | Secretos solo en Worker/GitHub Actions; PII redactada en logs; nada de datos reales en el repo.             |
 
 ## Estructura del repositorio
 

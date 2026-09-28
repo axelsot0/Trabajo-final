@@ -6,7 +6,7 @@
   depender de productos fuera del plan gratuito.
 - **Decisión:** El webhook valida, persiste el evento con clave única y responde 200 de
   inmediato. El procesamiento se lanza en el mismo request con `ctx.waitUntil` y un Cron
-  Trigger periódico barre eventos pendientes y el `outbox` con reintentos y *backoff*.
+  Trigger periódico barre eventos pendientes y el `outbox` con reintentos y _backoff_.
 - **Consecuencias:**
   - Idempotencia obligatoria: `webhook_events.external_event_key` y
     `messages.external_message_id` son únicos; los trabajos releen la versión de la

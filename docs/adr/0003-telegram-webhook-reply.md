@@ -2,7 +2,7 @@
 
 - **Estado:** Aceptado · 2026-09-27
 - **Contexto:** `getUpdates` y webhook son excluyentes en la Bot API. Un Worker no puede
-  hacer *long polling*. Varios agentes atienden varias conversaciones a la vez desde un
+  hacer _long polling_. Varios agentes atienden varias conversaciones a la vez desde un
   mismo chat privado con el bot, así que "el chat activo" es ambiguo.
 - **Decisión:** Webhook HTTPS en el mismo Worker (`/webhooks/telegram`), autenticado con
   el encabezado `X-Telegram-Bot-Api-Secret-Token`. Cada conversación de Instagram tiene

@@ -7,18 +7,18 @@ del plan.
 
 ## Hipótesis a comprobar
 
-| # | Hipótesis | Estado | Fecha | Resultado / evidencia anonimizada |
-|---:|---|---|---|---|
-| H1 | La cuenta está en modo profesional (Business o Creator) y puede autorizar la app con Instagram Login. | Pendiente | | |
-| H2 | Los permisos `instagram_business_basic` e `instagram_business_manage_messages` se conceden en la pantalla oficial. | Pendiente | | |
-| H3 | El webhook recibe el campo `messages` del objeto `instagram` con `sender.id`, `recipient.id`, `timestamp`, `message.mid`, `message.text`. | Pendiente | | |
-| H4 | Los ecos de mensajes propios llegan con `message.is_echo = true` y se descartan. | Pendiente | | |
-| H5 | El envío a `/{ig_user_id}/messages` responde en el mismo DM que abrió el cliente. | Pendiente | | |
-| H6 | Un usuario externo (no administrador/tester de la app) puede escribir y recibir respuesta sin App Review, o bien Meta exige revisión. | Pendiente | | |
-| H7 | La etiqueta `HUMAN_AGENT` está disponible para esta app (ventana de 7 días para humanos). | Pendiente | | |
-| H8 | La Conversations API devuelve el histórico con paginación y límites conocidos. | Pendiente | | |
-| H9 | Los mensajes enviados desde la app nativa u otras herramientas llegan al webhook (eco) y no rompen el estado. | Pendiente | | |
-| H10 | Los adjuntos llegan con `message.attachments[].type` y una URL temporal; no se descargan. | Pendiente | | |
+|   # | Hipótesis                                                                                                                                 | Estado    | Fecha | Resultado / evidencia anonimizada |
+| --: | ----------------------------------------------------------------------------------------------------------------------------------------- | --------- | ----- | --------------------------------- |
+|  H1 | La cuenta está en modo profesional (Business o Creator) y puede autorizar la app con Instagram Login.                                     | Pendiente |       |                                   |
+|  H2 | Los permisos `instagram_business_basic` e `instagram_business_manage_messages` se conceden en la pantalla oficial.                        | Pendiente |       |                                   |
+|  H3 | El webhook recibe el campo `messages` del objeto `instagram` con `sender.id`, `recipient.id`, `timestamp`, `message.mid`, `message.text`. | Pendiente |       |                                   |
+|  H4 | Los ecos de mensajes propios llegan con `message.is_echo = true` y se descartan.                                                          | Pendiente |       |                                   |
+|  H5 | El envío a `/{ig_user_id}/messages` responde en el mismo DM que abrió el cliente.                                                         | Pendiente |       |                                   |
+|  H6 | Un usuario externo (no administrador/tester de la app) puede escribir y recibir respuesta sin App Review, o bien Meta exige revisión.     | Pendiente |       |                                   |
+|  H7 | La etiqueta `HUMAN_AGENT` está disponible para esta app (ventana de 7 días para humanos).                                                 | Pendiente |       |                                   |
+|  H8 | La Conversations API devuelve el histórico con paginación y límites conocidos.                                                            | Pendiente |       |                                   |
+|  H9 | Los mensajes enviados desde la app nativa u otras herramientas llegan al webhook (eco) y no rompen el estado.                             | Pendiente |       |                                   |
+| H10 | Los adjuntos llegan con `message.attachments[].type` y una URL temporal; no se descargan.                                                 | Pendiente |       |                                   |
 
 ## Versión de API y cuerpo exacto
 

@@ -1,0 +1,35 @@
+{
+  // Configuración del Worker. Sin secretos: los valores sensibles van en
+  // `wrangler secret put` (producción) o `.dev.vars` (local, ignorado por git).
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ig-telegram-mvp",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+  },
+  // Dashboard estático. `run_worker_first` hace que el Worker autentique antes de
+  // servir cualquier asset: nada del panel es accesible de forma anónima.
+  "assets": {
+    "directory": "./dashboard",
+    "binding": "ASSETS",
+    "run_worker_first": true,
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "ig-telegram-mvp",
+      // Sustituir por el ID real tras `wrangler d1 create ig-telegram-mvp`.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations",
+    },
+  ],
+  "vars": {
+    "APP_ENV": "development",
+    "BUSINESS_TIMEZONE": "America/Santo_Domingo",
+    "AI_PROVIDER": "disabled",
+    "AI_MODE": "off",
+    "META_GRAPH_VERSION": "v23.0",
+  },
+}

@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.wrangler/
+coverage/
+*.log
+.DS_Store
+
+# Secretos locales: nunca se versionan
+.dev.vars
+.dev.vars.*
+.env
+.env.*
+!.env.example
