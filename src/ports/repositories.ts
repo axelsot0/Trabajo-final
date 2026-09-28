@@ -1,5 +1,13 @@
 import type { AuditEvent } from '../domain/audit.ts';
-import type { Conversation, ConversationMode, ModeChange } from '../domain/conversation.ts';
+import type { CatalogItem } from '../domain/catalog.ts';
+import type {
+  Conversation,
+  ConversationMode,
+  Intent,
+  ModeChange,
+  Priority,
+  Stage,
+} from '../domain/conversation.ts';
 import type { Customer } from '../domain/customer.ts';
 import type { Employee } from '../domain/employee.ts';
 import type { Id } from '../domain/ids.ts';
@@ -9,6 +17,7 @@ import type { OutboxItem, OutboxStatus } from '../domain/outbox.ts';
 import type { Outcome } from '../domain/outcome.ts';
 import type { CallbackToken, TelegramMessageLink } from '../domain/telegram.ts';
 import type { IsoUtc } from '../domain/time.ts';
+import type { AiReplyRecord, AiReplyUpdate, TriageEvent } from '../domain/triage.ts';
 import type { WebhookEvent, WebhookProcessStatus } from '../domain/webhook-event.ts';
 
 export interface IgAccountRepository {
@@ -72,6 +81,16 @@ export interface ConversationRepository {
   touchOutbound(conversationId: Id, atUtc: IsoUtc): Promise<void>;
   listByMode(mode: ConversationMode, limit: number, offset: number): Promise<Conversation[]>;
   listAssignedTo(employeeId: Id, limit: number, offset: number): Promise<Conversation[]>;
+  /** Actualiza intención, etapa y prioridad sin tocar modo ni versión. */
+  updateTriage(
+    conversationId: Id,
+    triage: { intent: Intent | null; stage: Stage | null; priority: Priority },
+  ): Promise<void>;
+  /**
+   * Conversaciones en BOT cuyo último mensaje es del cliente, anterior a `olderThanUtc`,
+   * y sin intento de IA registrado para ese mensaje: la red de seguridad del cron.
+   */
+  listBotAwaitingReply(olderThanUtc: IsoUtc, limit: number): Promise<Conversation[]>;
 }
 
 export interface MessageRepository {
@@ -89,6 +108,34 @@ export interface MessageRepository {
   ): Promise<void>;
   /** Mensajes salientes de la conversación con entrega `uncertain` o `queued`, más recientes primero. */
   listUnconfirmedOutbound(conversationId: Id): Promise<Message[]>;
+  /** Último mensaje entrante del cliente en la conversación. */
+  findLatestInbound(conversationId: Id): Promise<Message | null>;
+  /** Número de mensajes salientes con el origen indicado (p. ej. para el aviso de IA). */
+  countOutboundByOrigin(conversationId: Id, origin: Message['origin']): Promise<number>;
+}
+
+export interface CatalogRepository {
+  listActive(): Promise<CatalogItem[]>;
+  upsert(item: CatalogItem): Promise<void>;
+}
+
+export interface TriageRepository {
+  insert(event: TriageEvent): Promise<void>;
+  listForConversation(conversationId: Id, limit: number): Promise<TriageEvent[]>;
+}
+
+export interface AiReplyRepository {
+  /**
+   * Inserta el intento si no existe otro para el mismo mensaje disparador. Devuelve
+   * `false` si otro proceso ya lo reclamó: así nunca hay dos respuestas al mismo mensaje.
+   */
+  claim(record: AiReplyRecord): Promise<boolean>;
+  update(id: Id, update: AiReplyUpdate): Promise<void>;
+  findByTrigger(triggerMessageId: Id): Promise<AiReplyRecord | null>;
+  /** Llamadas al proveedor desde `sinceUtc` (cupo diario). */
+  countProviderCallsSince(sinceUtc: IsoUtc): Promise<number>;
+  /** Intentos que quedaron en `pending` (proceso interrumpido) antes de `olderThanUtc`. */
+  listStalePending(olderThanUtc: IsoUtc, limit: number): Promise<AiReplyRecord[]>;
 }
 
 export interface WebhookEventRepository {

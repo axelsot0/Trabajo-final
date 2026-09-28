@@ -4,6 +4,7 @@ import { toIsoUtc } from '../domain/time.ts';
 import type { WebhookEvent } from '../domain/webhook-event.ts';
 import type { Clock } from '../ports/clock.ts';
 import type { ConversationRepository, WebhookEventRepository } from '../ports/repositories.ts';
+import type { GenerateAiReply } from './generate-ai-reply.ts';
 import type { HandleTelegramUpdate } from './handle-telegram-update.ts';
 import type { ReceiveCustomerMessage } from './receive-customer-message.ts';
 import type { ReconcileEcho } from './reconcile-echo.ts';
@@ -25,7 +26,20 @@ export interface ProcessDeps {
   notifier: TelegramNotifier;
   clock: Clock;
   maxAttempts?: number;
+  /** Ausente cuando la IA está apagada: las conversaciones ya se escalaron al recibir. */
+  generateAiReply?: GenerateAiReply | null;
+  /** Espera antes de responder para agrupar ráfagas de mensajes del mismo cliente. */
+  aiDebounceMs?: number;
+  sleep?: (ms: number) => Promise<void>;
 }
+
+interface AiCandidate {
+  conversationId: string;
+  messageId: string;
+}
+
+const defaultSleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Procesa eventos pendientes reclamándolos de forma atómica. Se invoca desde
@@ -42,11 +56,38 @@ export class ProcessPendingWebhookEvents {
   async run(limit = 25): Promise<ProcessSummary> {
     const events = await this.deps.webhookEvents.claimPending(limit);
     const summary: ProcessSummary = { claimed: events.length, done: 0, ignored: 0, failed: 0 };
+    const aiCandidates: AiCandidate[] = [];
     for (const event of events) {
-      const status = await this.processOne(event);
+      const status = await this.processOne(event, aiCandidates);
       summary[status] += 1;
     }
+    await this.runAi(aiCandidates);
     return summary;
+  }
+
+  /**
+   * Respuestas automáticas tras procesar el lote. Espera un momento para que una
+   * ráfaga de mensajes se responda una sola vez (solo el último mensaje dispara).
+   * Un fallo aquí nunca marca el evento como fallido: el mensaje ya está guardado y
+   * el cron recoge las conversaciones en BOT sin respuesta.
+   */
+  private async runAi(candidates: AiCandidate[]): Promise<void> {
+    const generate = this.deps.generateAiReply;
+    if (generate === undefined || generate === null || candidates.length === 0) return;
+    const latestByConversation = new Map<string, string>();
+    for (const c of candidates) latestByConversation.set(c.conversationId, c.messageId);
+    const debounce = this.deps.aiDebounceMs ?? 0;
+    if (debounce > 0) await (this.deps.sleep ?? defaultSleep)(debounce);
+    for (const [conversationId, messageId] of latestByConversation) {
+      try {
+        await generate.execute(conversationId, messageId);
+      } catch (err) {
+        console.error('ai_generation_failed', {
+          conversationId,
+          error: err instanceof Error ? err.name : 'unknown',
+        });
+      }
+    }
   }
 
   /**
@@ -70,7 +111,10 @@ export class ProcessPendingWebhookEvents {
     }
   }
 
-  private async processOne(event: WebhookEvent): Promise<'done' | 'ignored' | 'failed'> {
+  private async processOne(
+    event: WebhookEvent,
+    aiCandidates: AiCandidate[],
+  ): Promise<'done' | 'ignored' | 'failed'> {
     const { webhookEvents, clock } = this.deps;
     const nowUtc = toIsoUtc(clock.now());
     try {
@@ -108,6 +152,12 @@ export class ProcessPendingWebhookEvents {
           });
           if (result.outcome === 'stored') {
             await this.notifyAgents(result.conversationId, result.escalated !== null);
+            if (result.escalated === null) {
+              aiCandidates.push({
+                conversationId: result.conversationId,
+                messageId: result.messageId,
+              });
+            }
           }
           if (result.outcome === 'stored' || result.outcome === 'duplicate') {
             await webhookEvents.markDone(event.id, nowUtc);

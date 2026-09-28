@@ -60,6 +60,28 @@ Nunca en `wrangler.jsonc`, frontend, SQL, URL, logs ni capturas. Localmente van 
 6. Baja de un agente: `UPDATE employees SET active = 0 WHERE id = '<uuid>'`. Sus tokens de
    botones dejan de valer de inmediato y no puede tomar ni responder conversaciones.
 
+## IA de ventas y catálogo
+
+- Modo en `wrangler.jsonc` → `AI_MODE`: `off` (todo a humanos), `review` (la IA solo redacta
+  borradores para el agente) o `auto`. Solo esos tres valores; cualquier otro tumba el Worker.
+- La IA solo afirma lo que está en `catalog_items`. Precios, tramos por volumen, existencias y
+  hechos se cambian en `seeds/yorki-cuties.sql` y se aplican con:
+
+  ```bash
+  npx wrangler d1 execute DB --remote --file seeds/yorki-cuties.sql
+  ```
+
+  Al vender un cachorro, bajar `quantity_available`; con 0 la IA deja de ofrecerlo.
+
+- `min_unit_price_minor` es el piso para negociar: solo aparece en las alertas de Telegram,
+  nunca en el prompt.
+- Traspasos automáticos a humano (con alerta en Telegram): regateo o contraoferta, compra de
+  3 o más, cliente listo para comprar, petición de persona, queja, tema delicado, pregunta
+  fuera de los datos aprobados, baja confianza, precio no aprobado en la respuesta, fallo del
+  proveedor o cupo diario (`AI_DAILY_LIMIT`) agotado.
+- Auditoría: `ai_replies` (una fila por mensaje respondido, con decisión, modelo, tokens y
+  latencia) y `triage_events` (intención, etapa, prioridad).
+
 ## Despliegue
 
 1. `npm run check` en verde en la rama protegida.

@@ -1,8 +1,10 @@
+import { WorkersAiProvider } from './adapters/ai/workers-ai.ts';
 import { createRepositories, type Repositories } from './adapters/d1/index.ts';
 import { MetaInstagramGateway } from './adapters/meta/instagram-gateway.ts';
 import { TelegramBotApiGateway } from './adapters/telegram/bot-api-gateway.ts';
 import { AgentActions } from './application/agent-actions.ts';
 import { DispatchOutbox } from './application/dispatch-outbox.ts';
+import { GenerateAiReply } from './application/generate-ai-reply.ts';
 import {
   HandleTelegramUpdate,
   type ActionHandler,
@@ -22,6 +24,7 @@ import {
 import { TelegramNotifier } from './application/telegram-notifier.ts';
 import { loadAppConfig, requireSecret, resolveTokenReference, type AppConfig } from './config.ts';
 import type { Env } from './env.ts';
+import type { AiProvider } from './ports/ai-provider.ts';
 import { systemClock, type Clock } from './ports/clock.ts';
 import type { InstagramGateway } from './ports/instagram-gateway.ts';
 import type { TelegramGateway } from './ports/telegram-gateway.ts';
@@ -42,10 +45,16 @@ export interface Container {
   queueOutboundText: QueueOutboundText;
   dispatchOutbox: DispatchOutbox;
   reconcileUncertainOutbox: ReconcileUncertainOutbox;
+  /** `null` cuando AI_MODE=off o no hay proveedor configurado. */
+  generateAiReply: GenerateAiReply | null;
 }
 
 export interface ContainerOverrides {
   clock?: Clock;
+  aiProvider?: AiProvider;
+  aiMode?: AppConfig['aiMode'];
+  aiDebounceMs?: number;
+  sleep?: (ms: number) => Promise<void>;
   instagramGateway?: InstagramGateway;
   telegramGateway?: TelegramGateway;
   agentText?: AgentTextHandler;
@@ -53,10 +62,15 @@ export interface ContainerOverrides {
 }
 
 export function createContainer(env: Env, overrides: ContainerOverrides = {}): Container {
-  const config = loadAppConfig(env);
+  const loaded = loadAppConfig(env);
+  const config: AppConfig = { ...loaded, aiMode: overrides.aiMode ?? loaded.aiMode };
   const clock = overrides.clock ?? systemClock;
   const repos = createRepositories(env.DB);
-  const aiEnabled = config.aiMode !== 'off' && config.aiProvider !== 'disabled';
+  // `external-http` aún no tiene adaptador: sin proveedor, todo va a humanos.
+  const aiProvider: AiProvider | null =
+    overrides.aiProvider ??
+    (config.aiProvider === 'workers-ai' ? new WorkersAiProvider(env.AI) : null);
+  const aiEnabled = config.aiMode !== 'off' && aiProvider !== null;
 
   const instagramGateway =
     overrides.instagramGateway ??
@@ -143,6 +157,33 @@ export function createContainer(env: Env, overrides: ContainerOverrides = {}): C
     },
     { aiEnabled },
   );
+  const generateAiReply =
+    aiProvider !== null && config.aiMode !== 'off'
+      ? new GenerateAiReply(
+          {
+            conversations: repos.conversations,
+            messages: repos.messages,
+            catalog: repos.catalog,
+            triage: repos.triage,
+            aiReplies: repos.aiReplies,
+            audit: repos.audit,
+            queue: queueOutboundText,
+            dispatch: dispatchOutbox,
+            notifier,
+            provider: aiProvider,
+            clock,
+          },
+          {
+            mode: config.aiMode,
+            model: config.aiModel,
+            dailyLimit: config.aiDailyLimit,
+            minConfidence: config.aiMinConfidence,
+            businessName: config.businessName,
+            providerTimeoutMs: 20_000,
+          },
+        )
+      : null;
+
   const reconcileEcho = new ReconcileEcho({
     igAccounts: repos.igAccounts,
     customers: repos.customers,
@@ -169,6 +210,9 @@ export function createContainer(env: Env, overrides: ContainerOverrides = {}): C
       handleTelegramUpdate,
       notifier,
       clock,
+      generateAiReply,
+      aiDebounceMs: overrides.aiDebounceMs ?? config.aiDebounceMs,
+      ...(overrides.sleep === undefined ? {} : { sleep: overrides.sleep }),
     }),
     agentActions,
     sendAgentReply,
@@ -183,5 +227,6 @@ export function createContainer(env: Env, overrides: ContainerOverrides = {}): C
       gateway: instagramGateway,
       clock,
     }),
+    generateAiReply,
   };
 }

@@ -73,6 +73,30 @@ export class D1MessageRepository implements MessageRepository {
     return results.map(toMessage);
   }
 
+  async findLatestInbound(conversationId: Id): Promise<Message | null> {
+    const row = await this.db
+      .prepare(
+        `SELECT * FROM messages
+         WHERE conversation_id = ?1 AND direction = 'inbound'
+         ORDER BY COALESCE(provider_timestamp_utc, ingested_at_utc) DESC
+         LIMIT 1`,
+      )
+      .bind(conversationId)
+      .first<MessageRow>();
+    return row ? toMessage(row) : null;
+  }
+
+  async countOutboundByOrigin(conversationId: Id, origin: Message['origin']): Promise<number> {
+    const row = await this.db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM messages
+         WHERE conversation_id = ?1 AND direction = 'outbound' AND origin = ?2`,
+      )
+      .bind(conversationId, origin)
+      .first<{ n: number }>();
+    return row?.n ?? 0;
+  }
+
   private insertStatement(m: Message, verb: 'INSERT' | 'INSERT OR IGNORE'): D1PreparedStatement {
     return this.db
       .prepare(

@@ -18,6 +18,10 @@ export type ModeReason =
   | 'ai_mode_off'
   | 'ai_review_required'
   | 'window_expired'
+  | 'price_negotiation'
+  | 'bulk_purchase'
+  | 'ready_to_buy'
+  | 'out_of_scope'
   | 'agent_claim'
   | 'agent_transfer'
   | 'agent_release'
@@ -69,6 +73,10 @@ export type EscalationReason = Extract<
   | 'ai_mode_off'
   | 'ai_review_required'
   | 'window_expired'
+  | 'price_negotiation'
+  | 'bulk_purchase'
+  | 'ready_to_buy'
+  | 'out_of_scope'
 >;
 
 export interface ModeChange {

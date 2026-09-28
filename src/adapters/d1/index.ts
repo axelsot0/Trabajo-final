@@ -1,5 +1,6 @@
 import { D1AuditRepository } from './audit-repository.ts';
 import { D1CallbackTokenRepository } from './callback-token-repository.ts';
+import { D1CatalogRepository } from './catalog-repository.ts';
 import { D1ConversationRepository } from './conversation-repository.ts';
 import { D1CustomerRepository } from './customer-repository.ts';
 import { D1EmployeeRepository } from './employee-repository.ts';
@@ -8,6 +9,7 @@ import { D1MessageRepository } from './message-repository.ts';
 import { D1OutboxRepository } from './outbox-repository.ts';
 import { D1OutcomeRepository } from './outcome-repository.ts';
 import { D1TelegramLinkRepository } from './telegram-link-repository.ts';
+import { D1AiReplyRepository, D1TriageRepository } from './triage-repository.ts';
 import { D1WebhookEventRepository } from './webhook-event-repository.ts';
 
 export interface Repositories {
@@ -22,6 +24,9 @@ export interface Repositories {
   telegramLinks: D1TelegramLinkRepository;
   callbackTokens: D1CallbackTokenRepository;
   outcomes: D1OutcomeRepository;
+  catalog: D1CatalogRepository;
+  triage: D1TriageRepository;
+  aiReplies: D1AiReplyRepository;
 }
 
 /** Fábrica única de repositorios sobre un binding D1. */
@@ -38,5 +43,8 @@ export function createRepositories(db: D1Database): Repositories {
     telegramLinks: new D1TelegramLinkRepository(db),
     callbackTokens: new D1CallbackTokenRepository(db),
     outcomes: new D1OutcomeRepository(db),
+    catalog: new D1CatalogRepository(db),
+    triage: new D1TriageRepository(db),
+    aiReplies: new D1AiReplyRepository(db),
   };
 }

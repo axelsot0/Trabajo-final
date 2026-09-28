@@ -1,4 +1,11 @@
-import type { Conversation, ConversationMode, ModeChange } from '../../domain/conversation.ts';
+import type {
+  Conversation,
+  ConversationMode,
+  Intent,
+  ModeChange,
+  Priority,
+  Stage,
+} from '../../domain/conversation.ts';
 import type { Id } from '../../domain/ids.ts';
 import type { IsoUtc } from '../../domain/time.ts';
 import type { ClaimResult, ConversationRepository } from '../../ports/repositories.ts';
@@ -171,6 +178,42 @@ export class D1ConversationRepository implements ConversationRepository {
          LIMIT ?2 OFFSET ?3`,
       )
       .bind(employeeId, limit, offset)
+      .all<ConversationRow>();
+    return results.map(toConversation);
+  }
+
+  async updateTriage(
+    conversationId: Id,
+    triage: { intent: Intent | null; stage: Stage | null; priority: Priority },
+  ): Promise<void> {
+    await this.db
+      .prepare('UPDATE conversations SET intent = ?2, stage = ?3, priority = ?4 WHERE id = ?1')
+      .bind(conversationId, triage.intent, triage.stage, triage.priority)
+      .run();
+  }
+
+  async listBotAwaitingReply(olderThanUtc: IsoUtc, limit: number): Promise<Conversation[]> {
+    const { results } = await this.db
+      .prepare(
+        `SELECT c.* FROM conversations c
+         WHERE c.mode = 'BOT'
+           AND c.last_customer_message_at_utc IS NOT NULL
+           AND c.last_customer_message_at_utc <= ?1
+           AND (c.last_message_at_utc IS NULL
+                OR c.last_message_at_utc <= c.last_customer_message_at_utc)
+           AND NOT EXISTS (
+             SELECT 1 FROM ai_replies r
+             WHERE r.trigger_message_id = (
+               SELECT m.id FROM messages m
+               WHERE m.conversation_id = c.id AND m.direction = 'inbound'
+               ORDER BY COALESCE(m.provider_timestamp_utc, m.ingested_at_utc) DESC
+               LIMIT 1
+             )
+           )
+         ORDER BY c.last_customer_message_at_utc ASC
+         LIMIT ?2`,
+      )
+      .bind(olderThanUtc, limit)
       .all<ConversationRow>();
     return results.map(toConversation);
   }

@@ -24,6 +24,10 @@
       "migrations_dir": "migrations",
     },
   ],
+  // Workers AI (plan Free: cupo diario de Neurons). Proveedor por defecto (ADR 0005).
+  "ai": {
+    "binding": "AI",
+  },
   // Barrido de respaldo (`scheduled` → runSweep): reintentos, conciliación de envíos
   // inciertos y outbox. 1.440 invocaciones/día, dentro del plan Free.
   "triggers": {
@@ -32,8 +36,16 @@
   "vars": {
     "APP_ENV": "development",
     "BUSINESS_TIMEZONE": "America/Santo_Domingo",
-    "AI_PROVIDER": "disabled",
-    "AI_MODE": "off",
+    "AI_PROVIDER": "workers-ai",
+    // off | review | auto. En auto la IA responde sola dentro de las reglas y traspasa
+    // regateos, compras por volumen y cierres de venta a humanos.
+    "AI_MODE": "auto",
+    "AI_MODEL": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    // Llamadas diarias al modelo (~80 Neurons cada una con el 70B; el cupo Free es 10.000).
+    "AI_DAILY_LIMIT": "100",
+    "AI_DEBOUNCE_MS": "4000",
+    "AI_MIN_CONFIDENCE": "0.6",
+    "BUSINESS_NAME": "Yorki Cuties",
     "META_GRAPH_VERSION": "v23.0",
     "DEFAULT_CURRENCY": "DOP",
   },

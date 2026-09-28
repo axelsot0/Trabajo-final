@@ -17,6 +17,9 @@ export default defineConfig(async () => {
             META_VERIFY_TOKEN: 'test-meta-verify-token',
             TELEGRAM_BOT_TOKEN: 'test-telegram-bot-token',
             TELEGRAM_WEBHOOK_SECRET: 'test-telegram-webhook-secret',
+            // Las pruebas nunca llaman a Workers AI: la IA se prueba con un proveedor falso.
+            AI_MODE: 'off',
+            AI_PROVIDER: 'disabled',
           },
         },
       }),

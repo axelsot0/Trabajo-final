@@ -11,6 +11,12 @@ const appConfigSchema = z.object({
   aiMode: z.enum(['off', 'review', 'auto']),
   metaGraphVersion: z.string().regex(/^v\d+\.\d+$/, 'formato esperado: vNN.N'),
   defaultCurrency: z.string().regex(/^[A-Z]{3}$/, 'ISO 4217 en mayúsculas'),
+  businessName: nonEmpty,
+  aiModel: nonEmpty,
+  /** Llamadas diarias máximas al proveedor; al llegar al límite todo pasa a humanos. */
+  aiDailyLimit: z.coerce.number().int().min(0),
+  aiDebounceMs: z.coerce.number().int().min(0).max(20_000),
+  aiMinConfidence: z.coerce.number().min(0).max(1),
 });
 
 export type AppConfig = z.infer<typeof appConfigSchema>;
@@ -27,6 +33,11 @@ export function loadAppConfig(env: Env): AppConfig {
     aiMode: env.AI_MODE,
     metaGraphVersion: env.META_GRAPH_VERSION,
     defaultCurrency: env.DEFAULT_CURRENCY,
+    businessName: env.BUSINESS_NAME,
+    aiModel: env.AI_MODEL,
+    aiDailyLimit: env.AI_DAILY_LIMIT,
+    aiDebounceMs: env.AI_DEBOUNCE_MS,
+    aiMinConfidence: env.AI_MIN_CONFIDENCE,
   });
 }
 

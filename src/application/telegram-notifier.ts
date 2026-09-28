@@ -141,6 +141,17 @@ export class TelegramNotifier {
     return delivered;
   }
 
+  /** Texto corto a todos los agentes activos con chat iniciado (alertas de venta o fallo). */
+  async broadcast(text: string): Promise<number> {
+    const handlers = await this.deps.employees.listActiveHandlers();
+    let delivered = 0;
+    for (const employee of handlers) {
+      if (employee.telegramChatId === null) continue;
+      if ((await this.tell(employee.telegramChatId, text)) !== null) delivered += 1;
+    }
+    return delivered;
+  }
+
   /** Aviso al agente asignado: el cliente escribió de nuevo. */
   async notifyAssigned(conversationId: Id, employeeId: Id): Promise<boolean> {
     return this.sendCard(employeeId, conversationId, 'notification');
