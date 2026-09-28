@@ -10,6 +10,7 @@ await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
 // El orden respeta las claves foráneas (hijas antes que padres); las tablas nuevas
 // que no aparezcan aquí se vacían después, por lo que deben añadirse si tienen FK.
 const deleteOrder = [
+  'outcomes',
   'callback_tokens',
   'telegram_message_links',
   'outbox',

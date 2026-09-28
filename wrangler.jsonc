@@ -31,5 +31,6 @@
     "AI_PROVIDER": "disabled",
     "AI_MODE": "off",
     "META_GRAPH_VERSION": "v23.0",
+    "DEFAULT_CURRENCY": "DOP",
   },
 }

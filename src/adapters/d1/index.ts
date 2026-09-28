@@ -6,6 +6,7 @@ import { D1EmployeeRepository } from './employee-repository.ts';
 import { D1IgAccountRepository } from './ig-account-repository.ts';
 import { D1MessageRepository } from './message-repository.ts';
 import { D1OutboxRepository } from './outbox-repository.ts';
+import { D1OutcomeRepository } from './outcome-repository.ts';
 import { D1TelegramLinkRepository } from './telegram-link-repository.ts';
 import { D1WebhookEventRepository } from './webhook-event-repository.ts';
 
@@ -20,6 +21,7 @@ export interface Repositories {
   audit: D1AuditRepository;
   telegramLinks: D1TelegramLinkRepository;
   callbackTokens: D1CallbackTokenRepository;
+  outcomes: D1OutcomeRepository;
 }
 
 /** Fábrica única de repositorios sobre un binding D1. */
@@ -35,5 +37,6 @@ export function createRepositories(db: D1Database): Repositories {
     audit: new D1AuditRepository(db),
     telegramLinks: new D1TelegramLinkRepository(db),
     callbackTokens: new D1CallbackTokenRepository(db),
+    outcomes: new D1OutcomeRepository(db),
   };
 }

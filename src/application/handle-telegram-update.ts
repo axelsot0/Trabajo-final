@@ -62,6 +62,8 @@ const HELP_TEXT = [
   'Comandos disponibles:',
   '/chats — cola pendiente y conversaciones activas',
   '/mischats — conversaciones asignadas a ti',
+  '/cerrar — (como Reply a una tarjeta) cerrar con resultado',
+  '/venta <importe> [moneda] [nota] — (como Reply) registrar el importe de una venta',
   '/ayuda — esta ayuda',
   '',
   'Para escribir al cliente, haz Reply sobre la tarjeta de su conversación.',
@@ -121,7 +123,8 @@ export class HandleTelegramUpdate {
       await this.sendList(employee, m.chatId, 'mychats_page', 0, null);
       return 'handled';
     }
-    if (text.length > 0 && !text.startsWith('/')) {
+    if (text.length > 0) {
+      // Texto libre y comandos contextuales (/cerrar, /venta) exigen Reply a una tarjeta.
       const result = await this.deps.agentText.handle({
         employee,
         chatId: m.chatId,
@@ -131,7 +134,9 @@ export class HandleTelegramUpdate {
       if (result === 'not_a_reply') {
         await this.deps.notifier.tell(
           m.chatId,
-          'Para escribir al cliente, haz Reply sobre la tarjeta de su conversación. Usa /chats para verlas.',
+          text.startsWith('/')
+            ? `${HELP_TEXT}\n\n/cerrar y /venta se usan como Reply a la tarjeta de la conversación.`
+            : 'Para escribir al cliente, haz Reply sobre la tarjeta de su conversación. Usa /chats para verlas.',
         );
       }
       return 'handled';
@@ -299,15 +304,3 @@ export class HandleTelegramUpdate {
     await notifier.tell(chatId, text, keyboard);
   }
 }
-
-/** Implementaciones por defecto hasta que la fase 6 conecte respuestas y acciones. */
-export const notYetAgentText: AgentTextHandler = {
-  handle: () => Promise.resolve('not_a_reply'),
-};
-export const notYetActions: ActionHandler = {
-  handle: () =>
-    Promise.resolve({
-      notice: 'Esta acción estará disponible en la siguiente fase.',
-      showAlert: true,
-    }),
-};

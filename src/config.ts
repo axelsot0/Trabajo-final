@@ -10,6 +10,7 @@ const appConfigSchema = z.object({
   aiProvider: z.enum(['workers-ai', 'external-http', 'disabled']),
   aiMode: z.enum(['off', 'review', 'auto']),
   metaGraphVersion: z.string().regex(/^v\d+\.\d+$/, 'formato esperado: vNN.N'),
+  defaultCurrency: z.string().regex(/^[A-Z]{3}$/, 'ISO 4217 en mayúsculas'),
 });
 
 export type AppConfig = z.infer<typeof appConfigSchema>;
@@ -25,6 +26,7 @@ export function loadAppConfig(env: Env): AppConfig {
     aiProvider: env.AI_PROVIDER,
     aiMode: env.AI_MODE,
     metaGraphVersion: env.META_GRAPH_VERSION,
+    defaultCurrency: env.DEFAULT_CURRENCY,
   });
 }
 

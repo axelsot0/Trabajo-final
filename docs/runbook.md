@@ -45,6 +45,18 @@ Nunca en `wrangler.jsonc`, frontend, SQL, URL, logs ni capturas. Localmente van 
 
 5. Cada agente debe abrir el bot y enviar `/start` una vez: así se registra su chat privado
    y empieza a recibir avisos. Sin ese paso, `/chats` funciona pero no recibe notificaciones.
+
+   Flujo de trabajo del agente:
+   - Recibe una tarjeta cuando una conversación pasa a humano; pulsa **Tomar** (gana uno solo).
+   - Responde al cliente haciendo **Reply** sobre la tarjeta; el bot confirma «Enviado» o
+     explica el motivo (ventana vencida, no asignado, Instagram sin confirmar, reintento).
+   - **Transferir** elige otro agente activo; **Cerrar** (o `/cerrar` como Reply) pide el
+     resultado: venta confirmada, sin venta, seguimiento o no determinado.
+   - Tras una venta confirmada, `/venta <importe> [moneda] [nota]` como Reply al mensaje de
+     cierre registra el importe declarado (no es prueba de pago).
+   - `/mischats` muestra lo asignado; `/chats` toda la cola. Ningún envío se resuelve por
+     "chat activo": sin Reply a una tarjeta no hay destino.
+
 6. Baja de un agente: `UPDATE employees SET active = 0 WHERE id = '<uuid>'`. Sus tokens de
    botones dejan de valer de inmediato y no puede tomar ni responder conversaciones.
 

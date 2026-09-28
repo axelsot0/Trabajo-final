@@ -172,7 +172,7 @@ describe('callbacks', () => {
     expect(telegram.sent.filter((m) => m.text.startsWith('Conversación #'))).toHaveLength(0);
   });
 
-  it('las acciones de gestión responden que llegan en la siguiente fase', async () => {
+  it('Tomar reclama la conversación y el token no se puede reutilizar', async () => {
     await send(textUpdate({ fromId: AGENT_TG, text: '/start' }));
     const { conversation } = await seedConversation(repos, 'PENDING_HUMAN');
     const me = await repos.employees.findByTelegramUserId(AGENT_TG);
@@ -182,7 +182,8 @@ describe('callbacks', () => {
     expect(await send(callbackUpdate({ fromId: AGENT_TG, messageId: 1, data: claim }))).toBe(
       'handled',
     );
-    expect(telegram.answered.at(-1)).toMatchObject({ showAlert: true });
+    expect(telegram.answered.at(-1)?.text).toContain('Conversación tomada');
+    expect((await repos.conversations.findById(conversation.id))?.mode).toBe('HUMAN');
     // Un token de un solo uso no se puede repetir.
     expect(await send(callbackUpdate({ fromId: AGENT_TG, messageId: 1, data: claim }))).toBe(
       'callback_invalid',

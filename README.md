@@ -77,6 +77,28 @@ npm run dev                      # Worker + dashboard en http://localhost:8787
 npm run check                    # format, lint, typecheck, test y build
 ```
 
+## Estado de la construcción
+
+| Paso | Entrega                                                                                | Estado    |
+| ---: | -------------------------------------------------------------------------------------- | --------- |
+|    0 | Documentación, alcance, ADR                                                            | Hecho     |
+|    1 | Worker TypeScript, D1, dashboard (guardado con 401), CI                                | Hecho     |
+|    2 | Dominio de estados, ventana de Meta, migración base, toma atómica                      | Hecho     |
+|    3 | Webhook de Meta: verificación, firma, persistencia idempotente, procesamiento diferido | Hecho     |
+|    4 | Envío a Instagram con outbox, reintentos, conciliación de acuses inciertos y ecos      | Hecho     |
+|    5 | Bot de Telegram: allowlist, `/chats`, tarjetas, tokens opacos, avisos                  | Hecho     |
+|    6 | Toma, Reply enrutado, transferencia, cierre con resultado y `/venta`                   | Hecho     |
+|    7 | Triaje y analítica en hora local                                                       | Pendiente |
+|    8 | IA con proveedor intercambiable y respuestas seguras de venta                          | Pendiente |
+|    9 | Variantes, exposiciones y resultados comerciales                                       | Pendiente |
+|   10 | Dashboard protegido con enlace de un solo uso                                          | Pendiente |
+|   11 | Endurecimiento: reintentos, observabilidad, recuperación                               | Pendiente |
+|   12 | Runbook de despliegue y checklist de salida                                            | Pendiente |
+
+Con `AI_MODE=off` (valor actual), todo mensaje entrante pasa a la cola humana y el sistema
+ya es operable de extremo a extremo por agentes desde Telegram una vez configuradas las
+cuentas reales.
+
 ## Plan de construcción
 
 Los pasos y sus criterios de aceptación están en la sección 10 del plan. Los puntos

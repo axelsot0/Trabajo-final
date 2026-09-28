@@ -6,6 +6,7 @@ import type { Id } from '../domain/ids.ts';
 import type { IgAccount, IgAccountStatus } from '../domain/ig-account.ts';
 import type { DeliveryStatus, Message } from '../domain/message.ts';
 import type { OutboxItem, OutboxStatus } from '../domain/outbox.ts';
+import type { Outcome } from '../domain/outcome.ts';
 import type { CallbackToken, TelegramMessageLink } from '../domain/telegram.ts';
 import type { IsoUtc } from '../domain/time.ts';
 import type { WebhookEvent, WebhookProcessStatus } from '../domain/webhook-event.ts';
@@ -144,4 +145,15 @@ export interface CallbackTokenRepository {
    */
   consume(token: string, nowUtc: IsoUtc): Promise<boolean>;
   deleteExpired(nowUtc: IsoUtc): Promise<number>;
+}
+
+export interface OutcomeRepository {
+  insert(outcome: Outcome): Promise<void>;
+  findLatestForConversation(conversationId: Id): Promise<Outcome | null>;
+  updateAmount(
+    id: Id,
+    amountMinor: number | null,
+    currency: string | null,
+    evidenceNote: string | null,
+  ): Promise<void>;
 }
