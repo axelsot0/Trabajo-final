@@ -29,9 +29,25 @@ export class D1ConversationRepository implements ConversationRepository {
   }
 
   async insert(c: Conversation): Promise<void> {
-    await this.db
+    await this.insertStatement(c, 'INSERT').run();
+  }
+
+  async insertIfNoneOpen(c: Conversation): Promise<Conversation> {
+    await this.insertStatement(c, 'INSERT OR IGNORE').run();
+    const open = await this.findOpenByCustomer(c.customerId);
+    if (open === null) {
+      throw new Error('conversations.insertIfNoneOpen: no hay conversación abierta tras insertar');
+    }
+    return open;
+  }
+
+  private insertStatement(
+    c: Conversation,
+    verb: 'INSERT' | 'INSERT OR IGNORE',
+  ): D1PreparedStatement {
+    return this.db
       .prepare(
-        `INSERT INTO conversations
+        `${verb} INTO conversations
            (id, ig_account_id, customer_id, mode, mode_reason, assigned_employee_id, priority,
             intent, stage, version, last_customer_message_at_utc, last_message_at_utc,
             opened_at_utc, closed_at_utc)
@@ -52,8 +68,7 @@ export class D1ConversationRepository implements ConversationRepository {
         c.lastMessageAtUtc,
         c.openedAtUtc,
         c.closedAtUtc,
-      )
-      .run();
+      );
   }
 
   async applyModeChange(

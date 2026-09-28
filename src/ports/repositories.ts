@@ -1,3 +1,4 @@
+import type { AuditEvent } from '../domain/audit.ts';
 import type { Conversation, ConversationMode, ModeChange } from '../domain/conversation.ts';
 import type { Customer } from '../domain/customer.ts';
 import type { Employee } from '../domain/employee.ts';
@@ -5,6 +6,7 @@ import type { Id } from '../domain/ids.ts';
 import type { IgAccount } from '../domain/ig-account.ts';
 import type { Message } from '../domain/message.ts';
 import type { IsoUtc } from '../domain/time.ts';
+import type { WebhookEvent, WebhookProcessStatus } from '../domain/webhook-event.ts';
 
 export interface IgAccountRepository {
   findById(id: Id): Promise<IgAccount | null>;
@@ -25,6 +27,11 @@ export interface CustomerRepository {
   findById(id: Id): Promise<Customer | null>;
   findByScopedId(igAccountId: Id, igScopedId: string): Promise<Customer | null>;
   insert(customer: Customer): Promise<void>;
+  /**
+   * Inserta si no existe `(ig_account_id, ig_scoped_id)` y devuelve la fila vigente.
+   * Seguro ante dos eventos del mismo cliente procesados en paralelo.
+   */
+  findOrCreate(customer: Customer): Promise<Customer>;
 }
 
 export type ClaimResult =
@@ -35,6 +42,11 @@ export interface ConversationRepository {
   /** Conversación no cerrada del cliente, si existe (a lo sumo una por cliente). */
   findOpenByCustomer(customerId: Id): Promise<Conversation | null>;
   insert(conversation: Conversation): Promise<void>;
+  /**
+   * Inserta la conversación salvo que el cliente ya tenga una abierta (índice parcial
+   * único) y devuelve la conversación abierta vigente.
+   */
+  insertIfNoneOpen(conversation: Conversation): Promise<Conversation>;
   /**
    * Aplica un cambio de modo solo si la versión coincide (control optimista).
    * Devuelve `false` si otra operación cambió la conversación antes.
@@ -65,4 +77,27 @@ export interface MessageRepository {
   insertIfNew(message: Message): Promise<{ inserted: boolean }>;
   insert(message: Message): Promise<void>;
   listRecent(conversationId: Id, limit: number): Promise<Message[]>;
+}
+
+export interface WebhookEventRepository {
+  /** Inserta si la clave externa no existe. Devuelve `false` en entregas repetidas. */
+  insertIfNew(event: WebhookEvent): Promise<boolean>;
+  findByKey(externalEventKey: string): Promise<WebhookEvent | null>;
+  /**
+   * Marca hasta `limit` eventos pendientes como `processing` (attempts + 1) de forma
+   * atómica y los devuelve. Dos barridos simultáneos nunca reciben el mismo evento.
+   */
+  claimPending(limit: number): Promise<WebhookEvent[]>;
+  markDone(id: Id, processedAtUtc: IsoUtc): Promise<void>;
+  markIgnored(id: Id, code: string, processedAtUtc: IsoUtc): Promise<void>;
+  /** Vuelve a `pending` si quedan intentos; si no, `failed`. */
+  markFailed(id: Id, code: string, maxAttempts: number): Promise<void>;
+  /** Devuelve a `pending` los eventos atascados en `processing` desde antes de `olderThanUtc`. */
+  releaseStuck(olderThanUtc: IsoUtc): Promise<number>;
+  countByStatus(): Promise<Record<WebhookProcessStatus, number>>;
+}
+
+export interface AuditRepository {
+  record(event: AuditEvent): Promise<void>;
+  listForEntity(entityType: string, entityId: Id, limit: number): Promise<AuditEvent[]>;
 }

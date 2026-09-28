@@ -23,9 +23,25 @@ export class D1CustomerRepository implements CustomerRepository {
   }
 
   async insert(customer: Customer): Promise<void> {
-    await this.db
+    await this.insertStatement(customer, 'INSERT').run();
+  }
+
+  async findOrCreate(customer: Customer): Promise<Customer> {
+    await this.insertStatement(customer, 'INSERT OR IGNORE').run();
+    const stored = await this.findByScopedId(customer.igAccountId, customer.igScopedId);
+    if (stored === null) {
+      throw new Error('customers.findOrCreate: la fila no existe tras insertar');
+    }
+    return stored;
+  }
+
+  private insertStatement(
+    customer: Customer,
+    verb: 'INSERT' | 'INSERT OR IGNORE',
+  ): D1PreparedStatement {
+    return this.db
       .prepare(
-        `INSERT INTO customers (id, ig_account_id, ig_scoped_id, display_name, created_at_utc)
+        `${verb} INTO customers (id, ig_account_id, ig_scoped_id, display_name, created_at_utc)
          VALUES (?1, ?2, ?3, ?4, ?5)`,
       )
       .bind(
@@ -34,7 +50,6 @@ export class D1CustomerRepository implements CustomerRepository {
         customer.igScopedId,
         customer.displayName,
         customer.createdAtUtc,
-      )
-      .run();
+      );
   }
 }

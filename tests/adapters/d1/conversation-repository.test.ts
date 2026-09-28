@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { createRepositories, type Repositories } from '../../../src/adapters/d1/index.ts';
 import { transition } from '../../../src/domain/conversation.ts';
-import { makeEmployee, seedConversation, T0 } from '../../support/fixtures.ts';
+import { makeConversation, makeEmployee, seedConversation, T0 } from '../../support/fixtures.ts';
 
 let repos: Repositories;
 
@@ -146,5 +146,31 @@ describe('ventana y orden de cola', () => {
     ]);
     const page2 = await repos.conversations.listByMode('PENDING_HUMAN', 2, 2);
     expect(page2.map((c) => c.id)).toEqual([low.conversation.id]);
+  });
+});
+
+describe('una sola conversación abierta por cliente', () => {
+  it('insertIfNoneOpen devuelve la abierta existente en vez de crear otra', async () => {
+    const { account, customer, conversation } = await seedConversation(repos, 'BOT');
+    const duplicate = makeConversation(account, customer, 'BOT');
+    const stored = await repos.conversations.insertIfNoneOpen(duplicate);
+    expect(stored.id).toBe(conversation.id);
+    const { results } = await env.DB.prepare(
+      'SELECT COUNT(*) AS n FROM conversations WHERE customer_id = ?1',
+    )
+      .bind(customer.id)
+      .all<{ n: number }>();
+    expect(results[0]?.n).toBe(1);
+  });
+
+  it('tras cerrar, el cliente puede abrir un nuevo ciclo de atención', async () => {
+    const { account, customer, conversation } = await seedConversation(repos, 'BOT');
+    const closed = transition(conversation, { type: 'close', employeeId: null });
+    await repos.conversations.applyModeChange(conversation.id, conversation.version, closed, T0);
+    const next = await repos.conversations.insertIfNoneOpen(
+      makeConversation(account, customer, 'BOT'),
+    );
+    expect(next.id).not.toBe(conversation.id);
+    expect(next.mode).toBe('BOT');
   });
 });

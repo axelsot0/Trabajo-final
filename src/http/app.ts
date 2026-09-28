@@ -4,10 +4,13 @@ import { error } from './response.ts';
 import { Router } from './router.ts';
 import { dashboardHandler } from './routes/dashboard.ts';
 import { healthHandler } from './routes/health.ts';
+import { metaWebhookReceiveHandler, metaWebhookVerifyHandler } from './routes/meta-webhook.ts';
 
 export function buildRouter(): Router {
   return new Router()
     .get('/health', healthHandler)
+    .get('/webhooks/meta', metaWebhookVerifyHandler)
+    .post('/webhooks/meta', metaWebhookReceiveHandler)
     .get('/app', dashboardHandler)
     .get('/app/*', dashboardHandler);
 }
