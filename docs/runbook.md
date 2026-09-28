@@ -18,6 +18,36 @@ reales (paso 12 del plan). Este documento se mantiene sin secretos ni datos pers
 Nunca en `wrangler.jsonc`, frontend, SQL, URL, logs ni capturas. Localmente van en
 `.dev.vars` (ignorado por git). En producción: `npx wrangler secret put <NOMBRE>`.
 
+## Telegram: alta del bot y de los agentes
+
+1. Crear el bot en BotFather y guardar el token como secreto: `npx wrangler secret put TELEGRAM_BOT_TOKEN`.
+2. Generar un secreto aleatorio para el webhook y guardarlo: `npx wrangler secret put TELEGRAM_WEBHOOK_SECRET`.
+3. Registrar el webhook (una sola vez, tras el deploy). El valor de `secret_token` debe ser
+   exactamente el mismo que el secreto anterior:
+
+   ```bash
+   curl -sS "https://api.telegram.org/bot<TOKEN>/setWebhook" \
+     -d "url=https://<worker>.workers.dev/webhooks/telegram" \
+     -d "secret_token=<TELEGRAM_WEBHOOK_SECRET>" \
+     -d "allowed_updates=[\"message\",\"callback_query\"]"
+   curl -sS "https://api.telegram.org/bot<TOKEN>/getWebhookInfo"
+   ```
+
+4. Dar de alta a cada agente con su `telegram_user_id` verificado (lo muestra, por ejemplo,
+   el bot oficial @userinfobot; pedirle al empleado que lo consulte). Hasta que exista la
+   pantalla del dashboard, se hace con SQL:
+
+   ```bash
+   npx wrangler d1 execute DB --remote --command \
+     "INSERT INTO employees (id, telegram_user_id, display_name, role, active, created_at_utc)
+      VALUES ('<uuid>', <telegram_user_id>, '<Nombre>', 'agent', 1, '<fecha ISO UTC>');"
+   ```
+
+5. Cada agente debe abrir el bot y enviar `/start` una vez: así se registra su chat privado
+   y empieza a recibir avisos. Sin ese paso, `/chats` funciona pero no recibe notificaciones.
+6. Baja de un agente: `UPDATE employees SET active = 0 WHERE id = '<uuid>'`. Sus tokens de
+   botones dejan de valer de inmediato y no puede tomar ni responder conversaciones.
+
 ## Despliegue
 
 1. `npm run check` en verde en la rama protegida.

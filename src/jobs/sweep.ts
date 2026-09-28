@@ -27,7 +27,9 @@ export async function runSweep(
   env: Env,
   container: Container = createContainer(env),
 ): Promise<SweepSummary> {
+  const nowUtc = toIsoUtc(container.clock.now());
   const cutoff = toIsoUtc(new Date(container.clock.now().getTime() - STUCK_PROCESSING_MS));
+  await container.repos.callbackTokens.deleteExpired(nowUtc);
   const webhookReleased = await container.repos.webhookEvents.releaseStuck(cutoff);
   const webhook = await container.processPendingWebhookEvents.run(100);
   const reconcile = await container.reconcileUncertainOutbox.run(50);

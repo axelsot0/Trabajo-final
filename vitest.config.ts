@@ -15,6 +15,8 @@ export default defineConfig(async () => {
             // Valores ficticios solo para pruebas; los reales viven en secretos del Worker.
             META_APP_SECRET: 'test-meta-app-secret',
             META_VERIFY_TOKEN: 'test-meta-verify-token',
+            TELEGRAM_BOT_TOKEN: 'test-telegram-bot-token',
+            TELEGRAM_WEBHOOK_SECRET: 'test-telegram-webhook-secret',
           },
         },
       }),

@@ -6,6 +6,7 @@ import type { Id } from '../domain/ids.ts';
 import type { IgAccount, IgAccountStatus } from '../domain/ig-account.ts';
 import type { DeliveryStatus, Message } from '../domain/message.ts';
 import type { OutboxItem, OutboxStatus } from '../domain/outbox.ts';
+import type { CallbackToken, TelegramMessageLink } from '../domain/telegram.ts';
 import type { IsoUtc } from '../domain/time.ts';
 import type { WebhookEvent, WebhookProcessStatus } from '../domain/webhook-event.ts';
 
@@ -127,4 +128,20 @@ export interface OutboxRepository {
   listUncertain(olderThanUtc: IsoUtc, limit: number): Promise<OutboxItem[]>;
   listByConversation(conversationId: Id, limit: number): Promise<OutboxItem[]>;
   countByStatus(): Promise<Record<OutboxStatus, number>>;
+}
+
+export interface TelegramLinkRepository {
+  insert(link: TelegramMessageLink): Promise<void>;
+  find(telegramChatId: number, telegramMessageId: number): Promise<TelegramMessageLink | null>;
+}
+
+export interface CallbackTokenRepository {
+  insert(token: CallbackToken): Promise<void>;
+  find(token: string): Promise<CallbackToken | null>;
+  /**
+   * Marca el token como usado solo si sigue disponible (no usado, no caducado).
+   * Devuelve `false` si otro callback lo consumió antes.
+   */
+  consume(token: string, nowUtc: IsoUtc): Promise<boolean>;
+  deleteExpired(nowUtc: IsoUtc): Promise<number>;
 }

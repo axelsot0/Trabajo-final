@@ -5,12 +5,14 @@ import { Router } from './router.ts';
 import { dashboardHandler } from './routes/dashboard.ts';
 import { healthHandler } from './routes/health.ts';
 import { metaWebhookReceiveHandler, metaWebhookVerifyHandler } from './routes/meta-webhook.ts';
+import { telegramWebhookHandler } from './routes/telegram-webhook.ts';
 
 export function buildRouter(): Router {
   return new Router()
     .get('/health', healthHandler)
     .get('/webhooks/meta', metaWebhookVerifyHandler)
     .post('/webhooks/meta', metaWebhookReceiveHandler)
+    .post('/webhooks/telegram', telegramWebhookHandler)
     .get('/app', dashboardHandler)
     .get('/app/*', dashboardHandler);
 }
