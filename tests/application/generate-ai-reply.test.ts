@@ -365,4 +365,17 @@ describe('GenerateAiReply', () => {
       expect(ownerTexts().join('\n')).toContain('devuelta a la IA. La IA respondió');
     });
   });
+
+  it('un cliente que sigue escribiendo en un chat pendiente vuelve a avisar a los agentes', async () => {
+    await customerSays('¿Me lo dejas en 17 mil?');
+    aiSays();
+    await container.processPendingWebhookEvents.run();
+    const cardsBefore = telegram.sent.filter((m) => m.text.startsWith('Conversación:')).length;
+
+    await customerSays('Hola, ¿sigue ahí?');
+    await container.processPendingWebhookEvents.run();
+    const cardsAfter = telegram.sent.filter((m) => m.text.startsWith('Conversación:')).length;
+    expect(cardsAfter).toBe(cardsBefore + 1);
+    expect(ai.requests).toHaveLength(1);
+  });
 });

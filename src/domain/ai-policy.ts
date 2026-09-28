@@ -148,6 +148,10 @@ export function decideAiAction(input: DecideInput): AiAction {
     handoff = rules.reason;
   }
   if (handoff === 'none' && quantity >= input.handoffMinQty) handoff = 'bulk_purchase';
+  // El modelo a veces marca "volumen" con 2 unidades: la cantidad explícita manda.
+  if (handoff === 'bulk_purchase' && quantity > 0 && quantity < input.handoffMinQty) {
+    handoff = 'none';
+  }
 
   const reply = assessment.reply.trim();
 

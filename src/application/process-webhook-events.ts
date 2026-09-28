@@ -94,11 +94,13 @@ export class ProcessPendingWebhookEvents {
    * Avisa por Telegram sin bloquear el procesamiento: si Telegram falla, el evento
    * sigue `done` (el mensaje ya está guardado) y `/chats` muestra la cola.
    */
-  private async notifyAgents(conversationId: string, justEscalated: boolean): Promise<void> {
+  private async notifyAgents(conversationId: string): Promise<void> {
     try {
       const conversation = await this.deps.conversations.findById(conversationId);
       if (conversation === null) return;
-      if (conversation.mode === 'PENDING_HUMAN' && justEscalated) {
+      // Pendiente de humano: cada mensaje nuevo vuelve a avisar, para que un cliente
+      // que sigue escribiendo nunca quede sin atender en silencio.
+      if (conversation.mode === 'PENDING_HUMAN') {
         await this.deps.notifier.notifyPending(conversationId);
       } else if (conversation.mode === 'HUMAN' && conversation.assignedEmployeeId !== null) {
         await this.deps.notifier.notifyAssigned(conversationId, conversation.assignedEmployeeId);
@@ -151,7 +153,7 @@ export class ProcessPendingWebhookEvents {
             isDeleted: inbound.isDeleted,
           });
           if (result.outcome === 'stored') {
-            await this.notifyAgents(result.conversationId, result.escalated !== null);
+            await this.notifyAgents(result.conversationId);
             if (result.escalated === null) {
               aiCandidates.push({
                 conversationId: result.conversationId,

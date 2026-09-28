@@ -65,7 +65,7 @@ describe('avisos a agentes', () => {
     }
   });
 
-  it('un segundo mensaje en PENDING_HUMAN no vuelve a avisar; en HUMAN avisa solo al asignado', async () => {
+  it('cada mensaje en PENDING_HUMAN vuelve a avisar a todos; en HUMAN solo al asignado', async () => {
     const a = makeEmployee(8001, 'agent', { telegramChatId: 8001 });
     const b = makeEmployee(8002, 'agent', { telegramChatId: 8002 });
     await repos.employees.insert(a);
@@ -77,7 +77,8 @@ describe('avisos a agentes', () => {
 
     await repos.webhookEvents.insertIfNew(inboundEvent('mid.2', 'cliente-1', 'Sigo aquí'));
     await container.processPendingWebhookEvents.run();
-    expect(telegram.sent).toHaveLength(2);
+    expect(telegram.sent).toHaveLength(4);
+    expect(telegram.sent.at(-1)?.text).toContain('Sigo aquí');
 
     const message = await repos.messages.findByExternalId('mid.1');
     const conversationId = message?.conversationId ?? '';
@@ -86,7 +87,7 @@ describe('avisos a agentes', () => {
 
     await repos.webhookEvents.insertIfNew(inboundEvent('mid.3', 'cliente-1', '¿Y el precio?'));
     await container.processPendingWebhookEvents.run();
-    expect(telegram.sent).toHaveLength(3);
+    expect(telegram.sent).toHaveLength(5);
     const last = telegram.sent.at(-1);
     expect(last?.chatId).toBe(8002);
     expect(last?.text).toContain('¿Y el precio?');

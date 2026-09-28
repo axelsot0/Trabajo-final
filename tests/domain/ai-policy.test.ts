@@ -93,6 +93,15 @@ describe('decideAiAction', () => {
     expect(action).toMatchObject({ kind: 'handoff', reason: 'bulk_purchase' });
   });
 
+  it('ignora un "volumen" del modelo cuando el cliente pidió menos del mínimo', () => {
+    const action = decideAiAction({
+      ...base,
+      assessment: assessment({ handoffReason: 'bulk_purchase', quantityRequested: 2 }),
+      rules: noRules,
+    });
+    expect(action.kind).toBe('reply');
+  });
+
   it('un precio no aprobado en la respuesta bloquea el envío', () => {
     const action = decideAiAction({
       ...base,
