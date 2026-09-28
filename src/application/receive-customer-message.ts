@@ -2,8 +2,11 @@ import type { MetaAttachmentRef } from '../adapters/meta/webhook-schema.ts';
 import { transition, type Conversation, type EscalationReason } from '../domain/conversation.ts';
 import { newId } from '../domain/ids.ts';
 import type { ContentType, Message } from '../domain/message.ts';
-import { fromUnixMillis, toIsoUtc } from '../domain/time.ts';
+import type { Customer } from '../domain/customer.ts';
+import type { IgAccount } from '../domain/ig-account.ts';
+import { fromIsoUtc, fromUnixMillis, MS_PER_DAY, toIsoUtc } from '../domain/time.ts';
 import type { Clock } from '../ports/clock.ts';
+import type { InstagramGateway } from '../ports/instagram-gateway.ts';
 import type {
   AuditRepository,
   ConversationRepository,
@@ -47,6 +50,8 @@ export interface ReceiveDeps {
   messages: MessageRepository;
   audit: AuditRepository;
   clock: Clock;
+  /** Para pedir nombre y usuario del cliente a Instagram; opcional en pruebas. */
+  profiles?: Pick<InstagramGateway, 'getUserProfile'>;
 }
 
 const knownContentTypes: Record<string, ContentType> = {
@@ -103,8 +108,11 @@ export class ReceiveCustomerMessage {
       igAccountId: account.id,
       igScopedId: input.senderScopedId,
       displayName: null,
+      username: null,
+      profileCheckedAtUtc: null,
       createdAtUtc: nowUtc,
     });
+    await this.refreshProfile(account, customer, nowUtc);
 
     // Política del MVP: una conversación cerrada no se reabre; un nuevo DM inicia un
     // nuevo ciclo de atención. La reapertura queda disponible en el dominio si el
@@ -149,6 +157,42 @@ export class ReceiveCustomerMessage {
 
     const escalated = await this.maybeEscalate(conversation, contentType, nowUtc, audit);
     return { outcome: 'stored', conversationId: conversation.id, messageId: message.id, escalated };
+  }
+
+  /**
+   * Nombre y usuario para las tarjetas de los agentes. Nunca bloquea la recepción:
+   * si Meta falla, se reintenta como mucho una vez al día.
+   */
+  private async refreshProfile(
+    account: IgAccount,
+    customer: Customer,
+    nowUtc: string,
+  ): Promise<void> {
+    const profiles = this.deps.profiles;
+    if (profiles === undefined) return;
+    if (customer.displayName !== null || customer.username !== null) return;
+    if (
+      customer.profileCheckedAtUtc !== null &&
+      fromIsoUtc(nowUtc).getTime() - fromIsoUtc(customer.profileCheckedAtUtc).getTime() < MS_PER_DAY
+    ) {
+      return;
+    }
+    try {
+      const result = await profiles.getUserProfile({
+        tokenReference: account.tokenReference,
+        scopedId: customer.igScopedId,
+      });
+      if (!result.ok) console.warn('ig_profile_unavailable', { code: result.errorCode });
+      await this.deps.customers.updateProfile(
+        customer.id,
+        result.ok
+          ? { displayName: result.name, username: result.username }
+          : { displayName: null, username: null },
+        nowUtc,
+      );
+    } catch (err) {
+      console.warn('ig_profile_failed', { error: err instanceof Error ? err.name : 'unknown' });
+    }
   }
 
   private async maybeEscalate(

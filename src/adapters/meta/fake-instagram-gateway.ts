@@ -1,4 +1,6 @@
 import type {
+  GetUserProfileInput,
+  GetUserProfileResult,
   InstagramGateway,
   ListRecentMessagesInput,
   ListRecentMessagesResult,
@@ -33,6 +35,15 @@ export class FakeInstagramGateway implements InstagramGateway {
       messageId: `mid.fake.${this.counter}`,
       recipientId: input.recipientId,
     });
+  }
+
+  /** Perfil que devolverá `getUserProfile`; por defecto, sin datos. */
+  profile: GetUserProfileResult = { ok: true, name: null, username: null };
+  readonly profileRequests: GetUserProfileInput[] = [];
+
+  getUserProfile(input: GetUserProfileInput): Promise<GetUserProfileResult> {
+    this.profileRequests.push(input);
+    return Promise.resolve(this.profile);
   }
 
   listRecentMessages(input: ListRecentMessagesInput): Promise<ListRecentMessagesResult> {

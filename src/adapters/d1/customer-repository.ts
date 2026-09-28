@@ -1,5 +1,6 @@
 import type { Customer } from '../../domain/customer.ts';
 import type { Id } from '../../domain/ids.ts';
+import type { IsoUtc } from '../../domain/time.ts';
 import type { CustomerRepository } from '../../ports/repositories.ts';
 import { toCustomer, type CustomerRow } from './rows.ts';
 
@@ -35,20 +36,41 @@ export class D1CustomerRepository implements CustomerRepository {
     return stored;
   }
 
+  async updateProfile(
+    id: Id,
+    profile: { displayName: string | null; username: string | null },
+    checkedAtUtc: IsoUtc,
+  ): Promise<void> {
+    await this.db
+      .prepare(
+        `UPDATE customers
+         SET display_name = COALESCE(?2, display_name),
+             username = COALESCE(?3, username),
+             profile_checked_at_utc = ?4
+         WHERE id = ?1`,
+      )
+      .bind(id, profile.displayName, profile.username, checkedAtUtc)
+      .run();
+  }
+
   private insertStatement(
     customer: Customer,
     verb: 'INSERT' | 'INSERT OR IGNORE',
   ): D1PreparedStatement {
     return this.db
       .prepare(
-        `${verb} INTO customers (id, ig_account_id, ig_scoped_id, display_name, created_at_utc)
-         VALUES (?1, ?2, ?3, ?4, ?5)`,
+        `${verb} INTO customers
+           (id, ig_account_id, ig_scoped_id, display_name, username, profile_checked_at_utc,
+            created_at_utc)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`,
       )
       .bind(
         customer.id,
         customer.igAccountId,
         customer.igScopedId,
         customer.displayName,
+        customer.username,
+        customer.profileCheckedAtUtc,
         customer.createdAtUtc,
       );
   }

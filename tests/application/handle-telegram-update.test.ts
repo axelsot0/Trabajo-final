@@ -123,7 +123,8 @@ describe('/chats y /mischats', () => {
       await send(callbackUpdate({ fromId: AGENT_TG, messageId: list?.messageId ?? 0, data: view })),
     ).toBe('handled');
     const card = telegram.lastTo(AGENT_TG);
-    expect(card?.text).toContain(`Conversación #${conversation.id.slice(0, 8)}`);
+    expect(card?.text).toContain(`Ref #${conversation.id.slice(0, 8)}`);
+    expect(card?.text).toContain('Estado: Nuevo · Atiende: Pendiente de humano');
     expect(card?.text).toContain('Cliente: Hola, ¿precio del combo?');
     expect(card?.text).toContain('Responde con Reply');
     expect(card?.inlineKeyboard?.[0]?.map((b) => b.text)).toEqual(['Tomar']);
@@ -143,7 +144,7 @@ describe('/chats y /mischats', () => {
 
     await send(textUpdate({ fromId: AGENT_TG, text: '/mischats' }));
     const list = telegram.lastTo(AGENT_TG);
-    expect(list?.text).toContain(`#${mine.conversation.id.slice(0, 8)}`);
+    expect(list?.text).toContain(`Cliente #${mine.customer.id.slice(0, 8)}`);
     expect(list?.inlineKeyboard?.[0]).toHaveLength(1);
   });
 });
@@ -169,7 +170,7 @@ describe('callbacks', () => {
     expect(await send(callbackUpdate({ fromId: AGENT_TG, messageId: 1, data: view }))).toBe(
       'callback_invalid',
     );
-    expect(telegram.sent.filter((m) => m.text.startsWith('Conversación #'))).toHaveLength(0);
+    expect(telegram.sent.filter((m) => m.text.startsWith('Conversación:'))).toHaveLength(0);
   });
 
   it('Tomar reclama la conversación y el token no se puede reutilizar', async () => {

@@ -47,8 +47,19 @@ export interface ListRecentMessagesInput {
 export type ListRecentMessagesResult =
   { ok: true; messages: RemoteMessage[] } | { ok: false; errorCode: string };
 
+export interface GetUserProfileInput {
+  tokenReference: string;
+  /** IGSID del cliente. */
+  scopedId: string;
+}
+
+export type GetUserProfileResult =
+  { ok: true; name: string | null; username: string | null } | { ok: false; errorCode: string };
+
 export interface InstagramGateway {
   sendText(input: SendTextInput): Promise<SendTextResult>;
   /** Mensajes recientes de la conversación con el cliente (Conversations API), para conciliar. */
   listRecentMessages(input: ListRecentMessagesInput): Promise<ListRecentMessagesResult>;
+  /** Nombre y usuario del cliente (User Profile API); requiere que el cliente haya escrito. */
+  getUserProfile(input: GetUserProfileInput): Promise<GetUserProfileResult>;
 }

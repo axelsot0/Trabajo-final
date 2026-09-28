@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import type { Repositories } from '../../src/adapters/d1/index.ts';
 import { FakeTelegramGateway } from '../../src/adapters/telegram/fake-telegram-gateway.ts';
+import { renderConversationCard } from '../../src/application/telegram-cards.ts';
 import { createContainer, type Container } from '../../src/container.ts';
 import { newId } from '../../src/domain/ids.ts';
 import { makeAccount, makeEmployee, T0 } from '../support/fixtures.ts';
@@ -99,5 +100,46 @@ describe('avisos a agentes', () => {
     const summary = await container.processPendingWebhookEvents.run();
     expect(summary).toMatchObject({ done: 1 });
     await expect(repos.messages.findByExternalId('mid.1')).resolves.not.toBeNull();
+  });
+});
+
+describe('tarjeta con el perfil del cliente', () => {
+  it('muestra nombre, @usuario, etapa y quién atiende', () => {
+    const text = renderConversationCard({
+      conversation: {
+        id: 'conv-0000-1111',
+        igAccountId: 'acc',
+        customerId: 'cus',
+        mode: 'BOT',
+        modeReason: 'new_conversation',
+        assignedEmployeeId: null,
+        priority: 'media',
+        intent: 'precio',
+        stage: 'interesado',
+        version: 1,
+        lastCustomerMessageAtUtc: null,
+        lastMessageAtUtc: null,
+        openedAtUtc: '2026-09-28T00:00:00.000Z',
+        closedAtUtc: null,
+      },
+      customer: {
+        id: 'cus',
+        igAccountId: 'acc',
+        igScopedId: '1651561651',
+        displayName: 'Orison Soto',
+        username: 'orisonsoto',
+        profileCheckedAtUtc: null,
+        createdAtUtc: '2026-09-28T00:00:00.000Z',
+      },
+      messages: [],
+      assignedName: null,
+      timeZone: 'America/Santo_Domingo',
+    });
+    expect(text.split('\n').slice(0, 3)).toEqual([
+      'Conversación: Orison Soto (@orisonsoto)',
+      'Estado: Interesado · Atiende: IA',
+      'Prioridad: media · Consulta: precio',
+    ]);
+    expect(text).not.toContain('1651561651');
   });
 });

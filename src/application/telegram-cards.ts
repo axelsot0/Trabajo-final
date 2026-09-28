@@ -1,5 +1,5 @@
-import type { Conversation } from '../domain/conversation.ts';
-import type { Customer } from '../domain/customer.ts';
+import type { Conversation, Intent, Stage } from '../domain/conversation.ts';
+import { customerLabel, type Customer } from '../domain/customer.ts';
 import { formatLocal } from '../domain/local-time.ts';
 import type { Message } from '../domain/message.ts';
 
@@ -16,7 +16,7 @@ export function truncate(text: string, max: number): string {
 }
 
 const modeLabel: Record<Conversation['mode'], string> = {
-  BOT: 'Bot',
+  BOT: 'IA',
   PENDING_HUMAN: 'Pendiente de humano',
   HUMAN: 'En atención humana',
   CLOSED: 'Cerrada',
@@ -28,6 +28,31 @@ const priorityLabel: Record<Conversation['priority'], string> = {
   baja: 'baja',
 };
 
+export const stageLabel: Record<Stage, string> = {
+  nuevo: 'Nuevo',
+  interesado: 'Interesado',
+  objecion: 'Objeción',
+  listo_para_comprar: 'Listo para comprar',
+  posventa: 'Posventa',
+};
+
+const intentLabel: Record<Intent, string> = {
+  precio: 'precio',
+  disponibilidad: 'disponibilidad',
+  pedido: 'pedido',
+  envio: 'envío',
+  postventa: 'postventa',
+  reclamo: 'reclamo',
+  saludo: 'saludo',
+  otro: 'otro',
+};
+
+/** Quién atiende: IA, nadie aún, el agente asignado o nadie (cerrada). */
+function attendedBy(c: Conversation, assignedName: string | null): string {
+  if (c.mode === 'HUMAN' && assignedName !== null) return assignedName;
+  return modeLabel[c.mode];
+}
+
 export interface CardInput {
   conversation: Conversation;
   customer: Customer;
@@ -37,24 +62,23 @@ export interface CardInput {
 }
 
 /**
- * Tarjeta de contexto de una conversación. Se envía como texto plano y muestra lo
- * mínimo necesario para atender: sin username ni datos de perfil.
+ * Tarjeta de contexto de una conversación, en texto plano: quién es el cliente, en qué
+ * etapa está, quién lo atiende y los últimos mensajes.
  */
 export function renderConversationCard(input: CardInput): string {
   const { conversation: c, customer, messages, assignedName, timeZone } = input;
   const lines: string[] = [];
-  lines.push(`Conversación #${shortId(c.id)} · cliente ${shortId(customer.id)}`);
-  lines.push(`Estado: ${modeLabel[c.mode]} · prioridad ${priorityLabel[c.priority]}`);
-  if (c.intent !== null || c.stage !== null) {
-    lines.push(`Triaje: ${c.intent ?? '—'} · etapa ${c.stage ?? '—'}`);
-  }
-  if (assignedName !== null) lines.push(`Agente: ${assignedName}`);
+  lines.push(`Conversación: ${customerLabel(customer)}`);
+  lines.push(`Estado: ${stageLabel[c.stage ?? 'nuevo']} · Atiende: ${attendedBy(c, assignedName)}`);
+  lines.push(
+    `Prioridad: ${priorityLabel[c.priority]}${c.intent === null ? '' : ` · Consulta: ${intentLabel[c.intent]}`}`,
+  );
   if (c.lastCustomerMessageAtUtc !== null) {
     lines.push(`Último mensaje del cliente: ${formatLocal(c.lastCustomerMessageAtUtc, timeZone)}`);
   }
   lines.push('');
   for (const m of messages.slice(-CARD_HISTORY_LIMIT)) {
-    const who = m.direction === 'inbound' ? 'Cliente' : m.origin === 'ai' ? 'Bot' : 'Negocio';
+    const who = m.direction === 'inbound' ? 'Cliente' : m.origin === 'ai' ? 'IA' : 'Negocio';
     const when = m.providerTimestampUtc ?? m.ingestedAtUtc;
     const body =
       m.body !== null
@@ -63,12 +87,13 @@ export function renderConversationCard(input: CardInput): string {
     lines.push(`${formatLocal(when, timeZone)} ${who}: ${body}`);
   }
   lines.push('');
-  lines.push('Responde con Reply a esta tarjeta para escribir al cliente.');
+  lines.push(`Ref #${shortId(c.id)} · Responde con Reply a esta tarjeta para escribir al cliente.`);
   return lines.join('\n');
 }
 
 export interface ListEntry {
   conversation: Conversation;
+  customerName: string;
   lastText: string | null;
   assignedName: string | null;
 }
@@ -90,7 +115,7 @@ export function renderConversationList(
         : ` · ${formatLocal(c.lastCustomerMessageAtUtc, timeZone)}`;
     const agent = e.assignedName === null ? '' : ` · ${e.assignedName}`;
     lines.push(
-      `${i + 1}. #${shortId(c.id)} · ${modeLabel[c.mode]} · ${priorityLabel[c.priority]}${when}${agent}`,
+      `${i + 1}. ${e.customerName} · ${stageLabel[c.stage ?? 'nuevo']} · ${modeLabel[c.mode]} · ${priorityLabel[c.priority]}${when}${agent}`,
     );
     if (e.lastText !== null) lines.push(`   «${truncate(e.lastText, 80)}»`);
   });

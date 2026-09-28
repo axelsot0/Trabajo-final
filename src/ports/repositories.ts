@@ -45,6 +45,12 @@ export interface CustomerRepository {
    * Seguro ante dos eventos del mismo cliente procesados en paralelo.
    */
   findOrCreate(customer: Customer): Promise<Customer>;
+  /** Guarda nombre/usuario (sin borrar valores previos) y la hora de la consulta. */
+  updateProfile(
+    id: Id,
+    profile: { displayName: string | null; username: string | null },
+    checkedAtUtc: IsoUtc,
+  ): Promise<void>;
 }
 
 export type ClaimResult =

@@ -70,6 +70,8 @@ export interface CustomerRow {
   ig_account_id: string;
   ig_scoped_id: string;
   display_name: string | null;
+  username: string | null;
+  profile_checked_at_utc: string | null;
   created_at_utc: string;
 }
 
@@ -79,6 +81,8 @@ export function toCustomer(row: CustomerRow): Customer {
     igAccountId: row.ig_account_id,
     igScopedId: row.ig_scoped_id,
     displayName: row.display_name,
+    username: row.username,
+    profileCheckedAtUtc: row.profile_checked_at_utc,
     createdAtUtc: row.created_at_utc,
   };
 }

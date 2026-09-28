@@ -82,7 +82,7 @@ async function anaClaims(conversationId: string) {
   const { claim, messageId } = await notifyCard(ana, conversationId);
   await send(callbackUpdate({ fromId: ANA_TG, messageId, data: claim }));
   const card = telegram.lastTo(ANA_TG);
-  expect(card?.text).toContain('En atención humana');
+  expect(card?.text).toContain('Atiende: Ana');
   return card?.messageId ?? 0;
 }
 
@@ -312,7 +312,7 @@ describe('transferir', () => {
       assignedEmployeeId: luis.id,
     });
     const luisCard = telegram.lastTo(LUIS_TG);
-    expect(luisCard?.text).toContain('Agente: Luis');
+    expect(luisCard?.text).toContain('Atiende: Luis');
 
     // Luis responde desde su tarjeta; Ana ya no puede.
     await send(

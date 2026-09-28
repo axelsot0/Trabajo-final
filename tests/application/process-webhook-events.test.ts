@@ -7,6 +7,7 @@ import { env } from 'cloudflare:workers';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { createRepositories, type Repositories } from '../../src/adapters/d1/index.ts';
+import { FakeInstagramGateway } from '../../src/adapters/meta/fake-instagram-gateway.ts';
 import { createContainer } from '../../src/container.ts';
 import { newId } from '../../src/domain/ids.ts';
 import worker from '../../src/index.ts';
@@ -92,6 +93,35 @@ describe('ProcessPendingWebhookEvents', () => {
       attempts: 2,
     });
     await expect(repos.messages.findByExternalId('mid.stuck')).resolves.not.toBeNull();
+  });
+});
+
+describe('perfil del cliente', () => {
+  it('pide nombre y usuario a Instagram una sola vez y no bloquea si falla', async () => {
+    const instagram = new FakeInstagramGateway();
+    instagram.profile = { ok: true, name: 'Orison Soto', username: 'orisonsoto' };
+    const container = createContainer(env, { instagramGateway: instagram });
+    await repos.webhookEvents.insertIfNew(pendingMessageEvent('mid.p1'));
+    await repos.webhookEvents.insertIfNew(pendingMessageEvent('mid.p2'));
+    await container.processPendingWebhookEvents.run();
+
+    const customer = await repos.customers.findByScopedId(
+      (await repos.igAccounts.findByIgUserId(IG_USER_ID))?.id ?? '',
+      'cliente-1',
+    );
+    expect(customer).toMatchObject({ displayName: 'Orison Soto', username: 'orisonsoto' });
+    expect(instagram.profileRequests).toHaveLength(1);
+
+    instagram.profile = { ok: false, errorCode: 'http_400' };
+    await repos.webhookEvents.insertIfNew({
+      ...pendingMessageEvent('mid.p3'),
+      payloadMinimal: pendingMessageEvent('mid.p3').payloadMinimal.replace(
+        'cliente-1',
+        'cliente-2',
+      ),
+    });
+    const summary = await container.processPendingWebhookEvents.run();
+    expect(summary.done).toBe(1);
   });
 });
 

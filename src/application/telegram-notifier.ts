@@ -1,3 +1,4 @@
+import { customerLabel } from '../domain/customer.ts';
 import type { Id } from '../domain/ids.ts';
 import { newCallbackToken, type CallbackAction } from '../domain/telegram.ts';
 import { MS_PER_DAY, MS_PER_HOUR, toIsoUtc } from '../domain/time.ts';
@@ -154,6 +155,14 @@ export class TelegramNotifier {
       if (await this.sendCard(employee.id, conversationId, 'notification')) delivered += 1;
     }
     return delivered;
+  }
+
+  /** Nombre legible del cliente de una conversación para avisos cortos. */
+  async conversationLabel(conversationId: Id): Promise<string> {
+    const conversation = await this.deps.conversations.findById(conversationId);
+    const customer =
+      conversation === null ? null : await this.deps.customers.findById(conversation.customerId);
+    return customer === null ? `#${conversationId.slice(0, 8)}` : customerLabel(customer);
   }
 
   /** Texto corto a todos los agentes activos con chat iniciado (alertas de venta o fallo). */

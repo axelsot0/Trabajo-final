@@ -26,7 +26,7 @@ República Dominicana) trata los mensajes directos que recibe a través de su si
 <h2>Qué datos tratamos</h2>
 <ul>
   <li>El texto de los mensajes directos que nos envías por Instagram y nuestras respuestas.</li>
-  <li>El identificador que Instagram asigna a tu cuenta para esta conversación y la fecha y hora de cada mensaje.</li>
+  <li>El identificador que Instagram asigna a tu cuenta para esta conversación, tu nombre y usuario de Instagram, y la fecha y hora de cada mensaje.</li>
   <li>Notas internas de atención: tipo de consulta, prioridad y, si compras, el resultado de la venta.</li>
 </ul>
 <p>No descargamos fotos, videos ni adjuntos. Nunca te pediremos contraseñas ni datos de tarjetas.</p>

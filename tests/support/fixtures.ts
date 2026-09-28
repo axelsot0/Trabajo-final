@@ -45,6 +45,8 @@ export function makeCustomer(igAccountId: string, overrides: Partial<Customer> =
     igAccountId,
     igScopedId: `igsid-${newId()}`,
     displayName: null,
+    username: null,
+    profileCheckedAtUtc: null,
     createdAtUtc: T0,
     ...overrides,
   };

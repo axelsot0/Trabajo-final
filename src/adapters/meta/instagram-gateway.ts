@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
 import type {
+  GetUserProfileInput,
+  GetUserProfileResult,
   InstagramGateway,
   ListRecentMessagesInput,
   ListRecentMessagesResult,
@@ -63,6 +65,10 @@ const conversationsResponseSchema = z
         .loose(),
     ),
   })
+  .loose();
+
+const profileResponseSchema = z
+  .object({ name: z.string().optional(), username: z.string().optional() })
   .loose();
 
 /** Códigos de Graph API que indican límite de tasa o fallo transitorio. */
@@ -203,5 +209,29 @@ export class MetaInstagramGateway implements InstagramGateway {
       }
     }
     return { ok: true, messages };
+  }
+
+  async getUserProfile(input: GetUserProfileInput): Promise<GetUserProfileResult> {
+    const token = this.options.resolveToken(input.tokenReference);
+    const url = new URL(
+      `${this.baseUrl}/${this.options.graphVersion}/${encodeURIComponent(input.scopedId)}`,
+    );
+    url.searchParams.set('fields', 'name,username');
+    let response: Response;
+    try {
+      response = await this.fetchImpl(url.toString(), {
+        method: 'GET',
+        headers: { authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
+    } catch {
+      return { ok: false, errorCode: 'network_error' };
+    }
+    if (!response.ok) return { ok: false, errorCode: `http_${response.status}` };
+    const parsed = profileResponseSchema.safeParse(await response.json().catch(() => null));
+    if (!parsed.success) return { ok: false, errorCode: 'unexpected_body' };
+    const clean = (v: string | undefined): string | null =>
+      v === undefined || v.trim().length === 0 ? null : v.trim();
+    return { ok: true, name: clean(parsed.data.name), username: clean(parsed.data.username) };
   }
 }

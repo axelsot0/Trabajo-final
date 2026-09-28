@@ -168,6 +168,7 @@ export function createContainer(env: Env, overrides: ContainerOverrides = {}): C
     employees: repos.employees,
     conversations: repos.conversations,
     messages: repos.messages,
+    customers: repos.customers,
     links: repos.telegramLinks,
     tokens: repos.callbackTokens,
     clock,
@@ -184,6 +185,7 @@ export function createContainer(env: Env, overrides: ContainerOverrides = {}): C
       messages: repos.messages,
       audit: repos.audit,
       clock,
+      profiles: instagramGateway,
     },
     { aiEnabled },
   );

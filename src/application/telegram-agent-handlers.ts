@@ -10,7 +10,6 @@ import type { ActionFailure, AgentActions } from './agent-actions.ts';
 import type { GenerateAiReply } from './generate-ai-reply.ts';
 import type { ActionHandler, AgentTextHandler } from './handle-telegram-update.ts';
 import type { SendAgentReply } from './send-agent-reply.ts';
-import { shortId } from './telegram-cards.ts';
 import type { TelegramNotifier } from './telegram-notifier.ts';
 
 export interface TelegramAgentHandlerDeps {
@@ -102,7 +101,10 @@ export class TelegramAgentTextHandler implements AgentTextHandler {
       result.outcome === 'cancelled' || result.outcome === 'failed'
         ? (cancelText[result.code ?? ''] ?? `No se pudo enviar (${result.code ?? 'error'}).`)
         : (replyOutcomeText[result.outcome] ?? 'Procesado.');
-    await this.deps.notifier.tell(chatId, `#${shortId(link.conversationId)} · ${notice}`);
+    await this.deps.notifier.tell(
+      chatId,
+      `${await this.deps.notifier.conversationLabel(link.conversationId)} · ${notice}`,
+    );
     return 'handled';
   }
 
@@ -120,7 +122,7 @@ export class TelegramAgentTextHandler implements AgentTextHandler {
     }
     const messageId = await this.deps.notifier.tell(
       chatId,
-      `¿Con qué resultado cierras la conversación #${shortId(conversationId)}?`,
+      `¿Con qué resultado cierras la conversación ${await this.deps.notifier.conversationLabel(conversationId)}?`,
       [buttons.slice(0, 2), buttons.slice(2)],
     );
     if (messageId !== null) await this.link(employee, chatId, messageId, conversationId);
@@ -217,8 +219,8 @@ export class TelegramActionHandler implements ActionHandler {
         const closingId = await this.deps.notifier.tell(
           chatId,
           kind === 'venta_confirmada'
-            ? `#${shortId(conversationId)} cerrada como venta confirmada. Opcional: responde a este mensaje con /venta <importe> [moneda] [nota].`
-            : `#${shortId(conversationId)} cerrada: ${outcomeLabel[kind]}.`,
+            ? `${await this.deps.notifier.conversationLabel(conversationId)} cerrada como venta confirmada. Opcional: responde a este mensaje con /venta <importe> [moneda] [nota].`
+            : `${await this.deps.notifier.conversationLabel(conversationId)} cerrada: ${outcomeLabel[kind]}.`,
         );
         if (closingId !== null)
           await this.textHandler.link(employee, chatId, closingId, conversationId);
@@ -244,7 +246,7 @@ export class TelegramActionHandler implements ActionHandler {
           }
           await this.deps.notifier.tell(
             chatId,
-            `¿A quién transfieres la conversación #${shortId(conversationId)}?`,
+            `¿A quién transfieres la conversación ${await this.deps.notifier.conversationLabel(conversationId)}?`,
             buttons,
           );
           return { notice: 'Elige el agente.' };
@@ -276,7 +278,7 @@ export class TelegramActionHandler implements ActionHandler {
               : 'La IA responderá al próximo mensaje del cliente.';
         await this.deps.notifier.tell(
           chatId,
-          `#${shortId(conversationId)} devuelta a la IA. ${detail}`,
+          `${await this.deps.notifier.conversationLabel(conversationId)} devuelta a la IA. ${detail}`,
         );
         return { notice: 'Devuelta a la IA.' };
       }

@@ -4,6 +4,8 @@
 
 - Texto de mensajes de Instagram (entrantes y salientes) y metadatos: IDs con alcance de
   Instagram (IGSID), `mid`, marca de tiempo de Meta en UTC, dirección y origen.
+- Nombre y usuario de Instagram del cliente (User Profile API), solo para que los agentes
+  lo reconozcan en Telegram. El identificador estable sigue siendo el IGSID.
 - Identidad de agentes: `telegram_user_id`, nombre visible y rol.
 - Decisiones de triaje, variantes de respuesta, exposiciones y resultados declarados por
   agentes (venta confirmada, importe opcional).

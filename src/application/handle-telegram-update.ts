@@ -1,10 +1,12 @@
 import type { TelegramMinimalUpdate } from '../adapters/telegram/update-schema.ts';
 import { canHandleConversations, type Employee } from '../domain/employee.ts';
+import { customerLabel } from '../domain/customer.ts';
 import type { Conversation, ConversationMode } from '../domain/conversation.ts';
 import type { CallbackToken } from '../domain/telegram.ts';
 import { toIsoUtc } from '../domain/time.ts';
 import type { Clock } from '../ports/clock.ts';
 import type {
+  CustomerRepository,
   CallbackTokenRepository,
   ConversationRepository,
   EmployeeRepository,
@@ -50,6 +52,7 @@ export interface HandleTelegramUpdateDeps {
   employees: EmployeeRepository;
   conversations: ConversationRepository;
   messages: MessageRepository;
+  customers: CustomerRepository;
   links: TelegramLinkRepository;
   tokens: CallbackTokenRepository;
   clock: Clock;
@@ -216,7 +219,8 @@ export class HandleTelegramUpdate {
     page: number,
     editMessageId: number | null,
   ): Promise<void> {
-    const { conversations, messages, employees, notifier, gateway, timeZone } = this.deps;
+    const { conversations, messages, employees, customers, notifier, gateway, timeZone } =
+      this.deps;
     const safePage = Math.max(0, page);
 
     let items: Conversation[];
@@ -244,8 +248,13 @@ export class HandleTelegramUpdate {
         conversation.assignedEmployeeId === null
           ? null
           : await employees.findById(conversation.assignedEmployeeId);
+      const customer = await customers.findById(conversation.customerId);
       entries.push({
         conversation,
+        customerName:
+          customer === null
+            ? `Cliente #${conversation.customerId.slice(0, 8)}`
+            : customerLabel(customer),
         lastText: recent[recent.length - 1]?.body ?? null,
         assignedName: assigned?.displayName ?? null,
       });
