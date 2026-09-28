@@ -25,6 +25,18 @@ describe('GET /health', () => {
   });
 });
 
+describe('GET /privacy', () => {
+  it('sirve la política de privacidad pública sin sesión', async () => {
+    const res = await worker.fetch('https://example.com/privacy');
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toContain('text/html');
+    expect(res.headers.get('content-security-policy')).toContain("default-src 'none'");
+    const body = await res.text();
+    expect(body).toContain('Política de privacidad');
+    expect(body).toContain('id="eliminacion"');
+  });
+});
+
 describe('GET /app', () => {
   it('nunca sirve el dashboard sin sesión', async () => {
     const res = await worker.fetch('https://example.com/app');
