@@ -3,6 +3,7 @@ import { D1CallbackTokenRepository } from './callback-token-repository.ts';
 import { D1CatalogRepository } from './catalog-repository.ts';
 import { D1ConversationRepository } from './conversation-repository.ts';
 import { D1CustomerRepository } from './customer-repository.ts';
+import { D1EmployeeInviteRepository } from './employee-invite-repository.ts';
 import { D1EmployeeRepository } from './employee-repository.ts';
 import { D1IgAccountRepository } from './ig-account-repository.ts';
 import { D1MessageRepository } from './message-repository.ts';
@@ -27,6 +28,7 @@ export interface Repositories {
   catalog: D1CatalogRepository;
   triage: D1TriageRepository;
   aiReplies: D1AiReplyRepository;
+  invites: D1EmployeeInviteRepository;
 }
 
 /** Fábrica única de repositorios sobre un binding D1. */
@@ -46,5 +48,6 @@ export function createRepositories(db: D1Database): Repositories {
     catalog: new D1CatalogRepository(db),
     triage: new D1TriageRepository(db),
     aiReplies: new D1AiReplyRepository(db),
+    invites: new D1EmployeeInviteRepository(db),
   };
 }

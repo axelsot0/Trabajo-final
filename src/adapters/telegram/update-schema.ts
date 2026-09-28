@@ -5,6 +5,7 @@ const user = z
     id: z.number().int(),
     is_bot: z.boolean().optional(),
     first_name: z.string().optional(),
+    last_name: z.string().optional(),
     username: z.string().optional(),
   })
   .loose();
@@ -62,6 +63,8 @@ export interface TelegramMinimalUpdate {
     date: number;
     text: string | null;
     replyToMessageId: number | null;
+    /** Nombre visible en Telegram; solo se usa al registrarse con una invitación. */
+    fromName?: string | null | undefined;
   } | null;
   callback: {
     id: string;
@@ -84,6 +87,7 @@ export const telegramMinimalUpdateSchema: z.ZodType<TelegramMinimalUpdate> = z.o
       date: z.number(),
       text: z.string().nullable(),
       replyToMessageId: z.number().nullable(),
+      fromName: z.string().nullable().optional(),
     })
     .nullable(),
   callback: z
@@ -114,6 +118,9 @@ export function toMinimalUpdate(update: TelegramUpdate): TelegramMinimalUpdate {
             date: m.date,
             text: m.text ?? null,
             replyToMessageId: m.reply_to_message?.message_id ?? null,
+            fromName:
+              [m.from.first_name, m.from.last_name].filter((p) => p !== undefined).join(' ') ||
+              (m.from.username === undefined ? null : `@${m.from.username}`),
           },
     callback:
       c === undefined

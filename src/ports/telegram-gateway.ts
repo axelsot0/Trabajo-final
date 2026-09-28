@@ -27,4 +27,6 @@ export interface TelegramGateway {
     text?: string;
     showAlert?: boolean;
   }): Promise<TelegramResult<null>>;
+  /** Datos del propio bot; su @usuario sirve para armar enlaces de invitación. */
+  getMe(): Promise<TelegramResult<{ username: string }>>;
 }

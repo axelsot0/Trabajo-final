@@ -21,7 +21,8 @@ export type CallbackAction =
   | 'close'
   | 'transfer'
   | 'outcome'
-  | 'return_to_ai';
+  | 'return_to_ai'
+  | 'deactivate';
 
 export interface CallbackToken {
   token: string;

@@ -9,7 +9,7 @@ import type {
   Stage,
 } from '../domain/conversation.ts';
 import type { Customer } from '../domain/customer.ts';
-import type { Employee } from '../domain/employee.ts';
+import type { Employee, EmployeeInvite, EmployeeRole } from '../domain/employee.ts';
 import type { Id } from '../domain/ids.ts';
 import type { IgAccount, IgAccountStatus } from '../domain/ig-account.ts';
 import type { DeliveryStatus, Message } from '../domain/message.ts';
@@ -34,6 +34,17 @@ export interface EmployeeRepository {
   listActiveHandlers(): Promise<Employee[]>;
   insert(employee: Employee): Promise<void>;
   setTelegramChatId(id: Id, telegramChatId: number): Promise<void>;
+  /** Todos los empleados, activos primero. */
+  listAll(): Promise<Employee[]>;
+  updateAccess(id: Id, access: { role: EmployeeRole; active: boolean }): Promise<void>;
+}
+
+export interface EmployeeInviteRepository {
+  insert(invite: EmployeeInvite): Promise<void>;
+  find(code: string): Promise<EmployeeInvite | null>;
+  /** Marca el código como usado solo si sigue libre. `false` si otro lo canjeó antes. */
+  consume(code: string, nowUtc: IsoUtc): Promise<boolean>;
+  setUsedBy(code: string, employeeId: Id): Promise<void>;
 }
 
 export interface CustomerRepository {

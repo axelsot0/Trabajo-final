@@ -285,6 +285,7 @@ export class TelegramActionHandler implements ActionHandler {
       case 'view':
       case 'chats_page':
       case 'mychats_page':
+      case 'deactivate':
         return { notice: 'Botón inválido.', showAlert: true };
     }
   }

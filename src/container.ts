@@ -11,6 +11,7 @@ import {
   type AgentTextHandler,
 } from './application/handle-telegram-update.ts';
 import { IngestMetaWebhook } from './application/ingest-meta-webhook.ts';
+import { ManageTeam } from './application/manage-team.ts';
 import { ProcessPendingWebhookEvents } from './application/process-webhook-events.ts';
 import { QueueOutboundText } from './application/queue-outbound-text.ts';
 import { ReceiveCustomerMessage } from './application/receive-customer-message.ts';
@@ -175,6 +176,12 @@ export function createContainer(env: Env, overrides: ContainerOverrides = {}): C
     timeZone: config.businessTimezone,
     agentText: overrides.agentText ?? agentTextHandler,
     actions: overrides.actions ?? actionHandler,
+    team: new ManageTeam({
+      employees: repos.employees,
+      invites: repos.invites,
+      audit: repos.audit,
+      clock,
+    }),
   });
 
   const receiveCustomerMessage = new ReceiveCustomerMessage(

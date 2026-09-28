@@ -54,6 +54,12 @@ export class FakeTelegramGateway implements TelegramGateway {
     return Promise.resolve({ ok: true, value: null });
   }
 
+  botUsername = 'yorki_test_bot';
+
+  getMe(): Promise<TelegramResult<{ username: string }>> {
+    return Promise.resolve({ ok: true, value: { username: this.botUsername } });
+  }
+
   /** Último mensaje enviado a un chat, para aserciones legibles. */
   lastTo(chatId: number): FakeSentMessage | undefined {
     return [...this.sent].reverse().find((m) => m.chatId === chatId);

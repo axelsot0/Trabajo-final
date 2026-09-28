@@ -1,5 +1,11 @@
 import type { TelegramMinimalUpdate } from '../adapters/telegram/update-schema.ts';
-import { canHandleConversations, type Employee } from '../domain/employee.ts';
+import {
+  canHandleConversations,
+  isEmployeeRole,
+  roleLabel,
+  type Employee,
+  type EmployeeRole,
+} from '../domain/employee.ts';
 import { customerLabel } from '../domain/customer.ts';
 import type { Conversation, ConversationMode } from '../domain/conversation.ts';
 import type { CallbackToken } from '../domain/telegram.ts';
@@ -14,6 +20,7 @@ import type {
   TelegramLinkRepository,
 } from '../ports/repositories.ts';
 import type { InlineButton, TelegramGateway } from '../ports/telegram-gateway.ts';
+import type { ManageTeam } from './manage-team.ts';
 import { renderConversationList, type ListEntry } from './telegram-cards.ts';
 import { LIST_TOKEN_TTL_MS, type TelegramNotifier } from './telegram-notifier.ts';
 
@@ -59,6 +66,29 @@ export interface HandleTelegramUpdateDeps {
   timeZone: string;
   agentText: AgentTextHandler;
   actions: ActionHandler;
+  team: ManageTeam;
+}
+
+const OWNER_HELP = [
+  '',
+  'Equipo (solo owner):',
+  '/invitar [agente|owner|lectura] — enlace para sumar a alguien al bot',
+  '/agentes — ver el equipo y quitar accesos',
+].join('\n');
+
+/** Palabras aceptadas para el rol en `/invitar`. */
+const ROLE_WORDS: Record<string, EmployeeRole> = {
+  agente: 'agent',
+  agent: 'agent',
+  owner: 'owner',
+  dueño: 'owner',
+  admin: 'owner',
+  lectura: 'viewer',
+  viewer: 'viewer',
+};
+
+function helpFor(employee: Employee): string {
+  return employee.role === 'owner' ? `${HELP_TEXT}\n${OWNER_HELP}` : HELP_TEXT;
 }
 
 const HELP_TEXT = [
@@ -92,13 +122,16 @@ export class HandleTelegramUpdate {
     if (m.isBot) return 'ignored_bot';
 
     const employee = await this.deps.employees.findByTelegramUserId(m.fromId);
+    const text = (m.text ?? '').trim();
+    const command = text.split(/\s+/)[0]?.toLowerCase() ?? '';
+
     if (!employee?.active) {
+      // Enlace de invitación: t.me/<bot>?start=<código> llega como "/start <código>".
+      const code = /^\/start\s+([A-Za-z0-9_-]{8,64})$/.exec(text)?.[1];
+      if (code !== undefined) return this.redeemInvite(m, code);
       await this.deps.notifier.tell(m.chatId, 'No estás autorizado para usar este bot.');
       return 'unauthorized';
     }
-
-    const text = (m.text ?? '').trim();
-    const command = text.split(/\s+/)[0]?.toLowerCase() ?? '';
 
     if (command === '/start') {
       if (employee.telegramChatId !== m.chatId) {
@@ -106,12 +139,20 @@ export class HandleTelegramUpdate {
       }
       await this.deps.notifier.tell(
         m.chatId,
-        `Hola, ${employee.displayName}. Ya puedes recibir avisos de conversaciones.\n\n${HELP_TEXT}`,
+        `Hola, ${employee.displayName}. Ya puedes recibir avisos de conversaciones.\n\n${helpFor(employee)}`,
       );
       return 'handled';
     }
     if (command === '/ayuda' || command === '/help') {
-      await this.deps.notifier.tell(m.chatId, HELP_TEXT);
+      await this.deps.notifier.tell(m.chatId, helpFor(employee));
+      return 'handled';
+    }
+    if (command === '/invitar') {
+      await this.invite(employee, m.chatId, text.split(/\s+/)[1]);
+      return 'handled';
+    }
+    if (command === '/agentes') {
+      await this.showTeam(employee, m.chatId);
       return 'handled';
     }
     if (!canHandleConversations(employee)) {
@@ -178,6 +219,32 @@ export class HandleTelegramUpdate {
     }
 
     switch (token.action) {
+      case 'deactivate': {
+        const result = await this.deps.team.deactivate(employee, token.params ?? '');
+        if (!result.ok) {
+          await answer(
+            result.reason === 'self'
+              ? 'No puedes quitarte a ti mismo.'
+              : result.reason === 'forbidden'
+                ? 'Solo un owner puede quitar accesos.'
+                : 'Esa persona ya no existe.',
+            true,
+          );
+          return 'handled';
+        }
+        await this.deps.notifier.tell(
+          c.chatId,
+          `${result.employee.displayName} ya no tiene acceso al bot.`,
+        );
+        if (result.employee.telegramChatId !== null) {
+          await this.deps.notifier.tell(
+            result.employee.telegramChatId,
+            'Tu acceso al bot de atención fue retirado.',
+          );
+        }
+        await answer('Acceso retirado.');
+        return 'handled';
+      }
       case 'view': {
         if (token.conversationId === null) break;
         const sent = await this.deps.notifier.sendCard(employee.id, token.conversationId, 'card');
@@ -209,6 +276,94 @@ export class HandleTelegramUpdate {
     }
     await answer('Botón inválido.');
     return 'callback_invalid';
+  }
+
+  private async redeemInvite(
+    m: NonNullable<TelegramMinimalUpdate['message']>,
+    code: string,
+  ): Promise<TelegramUpdateOutcome> {
+    const result = await this.deps.team.redeem({
+      code,
+      telegramUserId: m.fromId,
+      chatId: m.chatId,
+      displayName: m.fromName ?? `Agente ${m.fromId}`,
+    });
+    if (!result.ok) {
+      await this.deps.notifier.tell(
+        m.chatId,
+        'Esta invitación no es válida, ya se usó o venció. Pide un enlace nuevo a quien te invitó.',
+      );
+      return 'unauthorized';
+    }
+    const { employee } = result;
+    await this.deps.notifier.tell(
+      m.chatId,
+      `¡Bienvenido/a, ${employee.displayName}! Ya tienes acceso como ${roleLabel[employee.role]}. Aquí recibirás los avisos de conversaciones.\n\n${helpFor(employee)}`,
+    );
+    const inviter = await this.deps.employees.findById(result.invitedBy);
+    if (inviter?.telegramChatId !== null && inviter?.telegramChatId !== undefined) {
+      await this.deps.notifier.tell(
+        inviter.telegramChatId,
+        `${employee.displayName} se unió al bot como ${roleLabel[employee.role]}.`,
+      );
+    }
+    return 'handled';
+  }
+
+  private async invite(
+    owner: Employee,
+    chatId: number,
+    roleWord: string | undefined,
+  ): Promise<void> {
+    if (owner.role !== 'owner') {
+      await this.deps.notifier.tell(chatId, 'Solo un owner puede invitar personas al bot.');
+      return;
+    }
+    const role = roleWord === undefined ? 'agent' : ROLE_WORDS[roleWord.toLowerCase()];
+    if (role === undefined || !isEmployeeRole(role)) {
+      await this.deps.notifier.tell(chatId, 'Uso: /invitar [agente|owner|lectura]');
+      return;
+    }
+    const invite = await this.deps.team.createInvite(owner, role);
+    if (invite === null) return;
+    const me = await this.deps.gateway.getMe();
+    const how = me.ok
+      ? `https://t.me/${me.value.username}?start=${invite.code}`
+      : `Pídele que abra el bot y envíe:\n/start ${invite.code}`;
+    await this.deps.notifier.tell(
+      chatId,
+      `Invitación para ${roleLabel[role]} (un solo uso, vence en 48 h):\n${how}\n\nEnvíasela a la persona: al abrirla y pulsar Iniciar quedará registrada y te aviso.`,
+    );
+  }
+
+  private async showTeam(owner: Employee, chatId: number): Promise<void> {
+    if (owner.role !== 'owner') {
+      await this.deps.notifier.tell(chatId, 'Solo un owner puede gestionar el equipo.');
+      return;
+    }
+    const team = await this.deps.team.listTeam();
+    const lines = ['Equipo del bot:', ''];
+    const keyboard: InlineButton[][] = [];
+    for (const person of team) {
+      const status = person.active
+        ? person.telegramChatId === null
+          ? 'activo · aún no abrió el bot'
+          : 'activo'
+        : 'sin acceso';
+      lines.push(`• ${person.displayName} — ${roleLabel[person.role]} · ${status}`);
+      if (person.active && person.id !== owner.id) {
+        keyboard.push([
+          await this.deps.notifier.button(owner.id, {
+            text: `Quitar a ${person.displayName}`,
+            action: 'deactivate',
+            conversationId: null,
+            params: person.id,
+          }),
+        ]);
+      }
+    }
+    lines.push('', 'Para sumar a alguien: /invitar');
+    await this.deps.notifier.tell(chatId, lines.join('\n'), keyboard);
   }
 
   /** Lista paginada; si `editMessageId` viene, edita el mensaje en vez de enviar otro. */

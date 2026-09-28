@@ -1,4 +1,4 @@
-import type { Employee } from '../../domain/employee.ts';
+import type { Employee, EmployeeRole } from '../../domain/employee.ts';
 import type { Id } from '../../domain/ids.ts';
 import type { EmployeeRepository } from '../../ports/repositories.ts';
 import { bool, toEmployee, type EmployeeRow } from './rows.ts';
@@ -49,6 +49,20 @@ export class D1EmployeeRepository implements EmployeeRepository {
         employee.telegramChatId,
         employee.createdAtUtc,
       )
+      .run();
+  }
+
+  async listAll(): Promise<Employee[]> {
+    const { results } = await this.db
+      .prepare('SELECT * FROM employees ORDER BY active DESC, display_name')
+      .all<EmployeeRow>();
+    return results.map(toEmployee);
+  }
+
+  async updateAccess(id: Id, access: { role: EmployeeRole; active: boolean }): Promise<void> {
+    await this.db
+      .prepare('UPDATE employees SET role = ?2, active = ?3 WHERE id = ?1')
+      .bind(id, access.role, bool(access.active))
       .run();
   }
 

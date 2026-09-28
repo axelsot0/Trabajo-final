@@ -33,7 +33,11 @@ Nunca en `wrangler.jsonc`, frontend, SQL, URL, logs ni capturas. Localmente van 
    curl -sS "https://api.telegram.org/bot<TOKEN>/getWebhookInfo"
    ```
 
-4. Dar de alta a cada agente con su `telegram_user_id` verificado (lo muestra, por ejemplo,
+4. Alta de agentes desde Telegram (recomendado): un `owner` envía `/invitar` (o
+   `/invitar owner`, `/invitar lectura`) y reenvía el enlace `t.me/<bot>?start=<código>`.
+   Es de un solo uso y vence a las 48 h; al abrirlo, la persona queda registrada con su
+   identidad de Telegram y el owner recibe un aviso. `/agentes` lista el equipo y permite
+   quitar accesos. Alternativa manual: dar de alta a cada agente con su `telegram_user_id` verificado (lo muestra, por ejemplo,
    el bot oficial @userinfobot; pedirle al empleado que lo consulte). Hasta que exista la
    pantalla del dashboard, se hace con SQL:
 

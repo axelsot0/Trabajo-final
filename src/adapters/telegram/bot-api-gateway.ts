@@ -92,6 +92,14 @@ export class TelegramBotApiGateway implements TelegramGateway {
     return result.ok ? { ok: true, value: null } : result;
   }
 
+  async getMe(): Promise<TelegramResult<{ username: string }>> {
+    const result = await this.call('getMe', {});
+    if (!result.ok) return result;
+    const parsed = z.object({ username: z.string() }).loose().safeParse(result.value);
+    if (!parsed.success) return { ok: false, errorCode: 'unexpected_body', description: null };
+    return { ok: true, value: { username: parsed.data.username } };
+  }
+
   private async call(
     method: string,
     body: Record<string, unknown>,
